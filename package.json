@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "node tools/copy-litert-wasm.mjs",
+    "predev": "node tools/copy-litert-wasm.mjs",
+    "prebuild": "node tools/copy-litert-wasm.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
@@ -29,7 +32,6 @@
     "@webgpu/types": "^0.1.71",
     "typescript": "^7.0.2",
     "vite": "^8.1.4",
-    "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^4.1.10"
   }
 }

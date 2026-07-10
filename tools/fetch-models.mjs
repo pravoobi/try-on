@@ -8,6 +8,12 @@ import { fileURLToPath } from 'node:url';
 
 const MODELS = [
   {
+    // square (256×256) general model — better person resolution on portrait photos
+    file: 'selfie_segmenter.tflite',
+    url: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite',
+  },
+  {
+    // landscape (256×144) model — for the live-webcam phase
     file: 'selfie_segmenter_landscape.tflite',
     url: 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite',
   },

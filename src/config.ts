@@ -1,7 +1,10 @@
 /** All tunables and paths live here (see CLAUDE.md conventions). */
 export const config = {
   models: {
-    segmenter: '/models/selfie_segmenter_landscape.tflite',
+    // Square general model: best person resolution on portrait photos.
+    // Swap to selfie_segmenter_landscape.tflite (256×144) for live landscape
+    // webcam frames in Phase 3.
+    segmenter: '/models/selfie_segmenter.tflite',
     pose: '/models/movenet_singlepose_lightning.tflite',
   },
   /** Directory the LiteRT.js Wasm runtime is served from (vite-plugin-static-copy). */
