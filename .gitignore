@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.local
+.DS_Store
+
+# fetched binaries — re-fetch with `npm run fetch-models` / `npm run fetch-test-photos`
+public/models/*.tflite
+public/test-photos/
