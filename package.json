@@ -16,6 +16,7 @@
     "fetch-test-photos": "node tools/fetch-test-photos.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@litertjs/core": "^2.5.2",
     "@litertjs/tfjs-interop": "^2.5.0",
     "@tensorflow/tfjs-backend-cpu": "^4.22.0",

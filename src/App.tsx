@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { assetUrl } from './assetUrl';
+import { BitmapCanvas } from './components/BitmapCanvas';
 import { DebugCanvas, type GarmentOverlay } from './components/DebugCanvas';
 import { GarmentPicker } from './components/GarmentPicker';
 import { PerfStats } from './components/PerfStats';
 import { config } from './config';
 import type { Garment } from './garments/schema';
+import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
 import { useLiveTryOn } from './hooks/useLiveTryOn';
 import { usePipeline } from './hooks/usePipeline';
@@ -55,6 +57,16 @@ export default function App() {
   const imageRef = useRef<ImageBitmap | null>(null);
   const resultRef = useRef<PipelineResult | null>(null);
   const garmentImagesRef = useRef<LoadedGarmentImages | null>(null);
+
+  // Advanced mode (Phase A1, see docs/plan-3d-garment-assets.md): the depth
+  // worker + its ~50MB model only exist once the user opts in via the
+  // "Enhance (3D)" button below.
+  const advanced = useAdvancedMode();
+  const [showDepth, setShowDepth] = useState(false);
+  const [photoDepth, setPhotoDepth] = useState<ImageBitmap | null>(null);
+  const [garmentDepth, setGarmentDepth] = useState<ImageBitmap | null>(null);
+  const photoDepthRef = useRef<ImageBitmap | null>(null);
+  const garmentDepthRef = useRef<ImageBitmap | null>(null);
 
   const run = useCallback(
     async (bitmap: ImageBitmap) => {
@@ -150,6 +162,73 @@ export default function App() {
     };
   }, [selectedGarment]);
 
+  // Photo-mode depth overlay (Phase A1 scope only — live-mode depth
+  // throttling is Phase A5). Recomputes whenever the displayed photo
+  // changes while the "depth" toggle is on, or when the toggle turns on.
+  useEffect(() => {
+    if (!showDepth || mode !== 'photo' || advanced.status !== 'ready' || !image) {
+      photoDepthRef.current?.close();
+      photoDepthRef.current = null;
+      setPhotoDepth(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        // estimateDepth transfers (consumes) its input; keep our own copy for rendering.
+        const copy = await createImageBitmap(image);
+        const depth = await advanced.estimateDepth(copy);
+        if (cancelled) {
+          depth.close();
+          return;
+        }
+        photoDepthRef.current?.close();
+        photoDepthRef.current = depth;
+        setPhotoDepth(depth);
+      } catch {
+        // Depth is a debug-overlay feature; a failure here shouldn't block the app.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDepth, mode, advanced.status, image]);
+
+  // Garment depth preview (Phase A1 "done when": depth maps render for
+  // garment images too). Uses the garment's front/primary image — the
+  // choli for a lehenga-choli, the single image otherwise.
+  useEffect(() => {
+    const primaryImage =
+      garmentImages?.kind === 'lehenga-choli' ? garmentImages.choliImage : (garmentImages?.image ?? null);
+    if (advanced.status !== 'ready' || !primaryImage) {
+      garmentDepthRef.current?.close();
+      garmentDepthRef.current = null;
+      setGarmentDepth(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const copy = await createImageBitmap(primaryImage);
+        const depth = await advanced.estimateDepth(copy);
+        if (cancelled) {
+          depth.close();
+          return;
+        }
+        garmentDepthRef.current?.close();
+        garmentDepthRef.current = depth;
+        setGarmentDepth(depth);
+      } catch {
+        // Best-effort preview; ignore failures.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanced.status, garmentImages]);
+
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) void loadBitmap(file);
@@ -242,6 +321,41 @@ export default function App() {
         </label>
       </div>
 
+      <div className="controls">
+        {advanced.status === 'off' && (
+          <button onClick={() => advanced.setEnabled(true)}>
+            Enhance (3D) · ~30MB one-time download{!advanced.webgpuSupported ? ' · CPU (slower)' : ''}
+          </button>
+        )}
+        {advanced.status === 'downloading' && (
+          <span className="hint">
+            downloading depth model…{' '}
+            {advanced.progress !== null ? `${Math.round(advanced.progress * 100)}%` : ''}
+          </span>
+        )}
+        {advanced.status === 'error' && (
+          <>
+            <span className="error">advanced mode failed: {advanced.error}</span>
+            <button onClick={() => advanced.setEnabled(false)}>dismiss</button>
+          </>
+        )}
+        {advanced.status === 'ready' && (
+          <>
+            <span className="hint">advanced mode ready ({advanced.device})</span>
+            <label>
+              <input
+                type="checkbox"
+                checked={showDepth}
+                disabled={mode !== 'photo'}
+                onChange={(e) => setShowDepth(e.target.checked)}
+              />
+              depth
+            </label>
+            <button onClick={() => advanced.setEnabled(false)}>turn off</button>
+          </>
+        )}
+      </div>
+
       {mode === 'photo' && (
         <div className="controls">
           <label>
@@ -281,6 +395,11 @@ export default function App() {
             onSelect={setSelectedGarment}
           />
         )}
+        {garmentDepth && (
+          <span className="garment-depth-preview" title="garment depth map">
+            <BitmapCanvas bitmap={garmentDepth} />
+          </span>
+        )}
       </div>
 
       {runError && <p className="error">{runError}</p>}
@@ -301,6 +420,7 @@ export default function App() {
             showMask={showMask}
             showSkeleton={showSkeleton}
             garment={garmentOverlay}
+            depthBitmap={mode === 'photo' ? photoDepth : null}
             onTryOnStatus={setTryOnStatus}
           />
         ) : (

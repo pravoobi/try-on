@@ -28,11 +28,22 @@ interface Props {
   showMask: boolean;
   showSkeleton: boolean;
   garment?: GarmentOverlay | null;
+  /** Advanced-mode depth map (Phase A1) — when present, replaces the frame/garment
+   * render with the depth visualization so its quality can be inspected directly. */
+  depthBitmap?: ImageBitmap | null;
   onTryOnStatus?: (status: TryOnStatus | null) => void;
 }
 
-/** Draws the photo, an optional try-on garment layer, and debug overlays (mask tint, skeleton). */
-export function DebugCanvas({ image, result, showMask, showSkeleton, garment, onTryOnStatus }: Props) {
+/** Draws the photo, an optional try-on garment layer, and debug overlays (mask tint, skeleton, depth). */
+export function DebugCanvas({
+  image,
+  result,
+  showMask,
+  showSkeleton,
+  garment,
+  depthBitmap,
+  onTryOnStatus,
+}: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -46,7 +57,13 @@ export function DebugCanvas({ image, result, showMask, showSkeleton, garment, on
     if (!ctx) return;
 
     let tryOnStatus: TryOnStatus | null = null;
-    if (garment && result) {
+    if (depthBitmap) {
+      // Depth is a standalone inspection view, not a tint over the try-on
+      // render — drawing the garment underneath would just make the depth
+      // map harder to read, not easier.
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(depthBitmap, 0, 0, w, h);
+    } else if (garment && result) {
       if (garment.kind === 'single') {
         tryOnStatus = renderTryOn(ctx, {
           frame: image,
@@ -74,7 +91,7 @@ export function DebugCanvas({ image, result, showMask, showSkeleton, garment, on
     }
     onTryOnStatus?.(tryOnStatus);
 
-    if (result && showMask) {
+    if (result && showMask && !depthBitmap) {
       const tinted = tintMask(renderFeatheredMask(result.maskBitmap, w, h), '#2dd4bf');
       ctx.globalAlpha = config.maskOpacity;
       ctx.drawImage(tinted, 0, 0);
@@ -115,7 +132,7 @@ export function DebugCanvas({ image, result, showMask, showSkeleton, garment, on
         }
       }
     }
-  }, [image, result, showMask, showSkeleton, garment, onTryOnStatus]);
+  }, [image, result, showMask, showSkeleton, garment, depthBitmap, onTryOnStatus]);
 
   return <canvas ref={ref} className="debug-canvas" />;
 }
