@@ -75,6 +75,17 @@ export type GarmentAnchors = Record<AnchorName, Point>;
 /** Same shape as GarmentAnchors, but in frame/body pixel space — the TPS warp target. */
 export type BodyAnchors = GarmentAnchors;
 
+/**
+ * A skirt (the lehenga half of a lehenga-choli) has no shoulders — only a
+ * waistband and a hem. Kept distinct from GarmentAnchors rather than faking
+ * degenerate shoulder points through the 6-anchor shape.
+ */
+export const SKIRT_ANCHOR_NAMES = ['waistL', 'waistR', 'hemL', 'hemR'] as const;
+
+export type SkirtAnchorName = (typeof SKIRT_ANCHOR_NAMES)[number];
+
+export type SkirtAnchors = Record<SkirtAnchorName, Point>;
+
 /** How far below the hips a garment's hem falls (see CLAUDE.md garment data model). */
 export type HemLength = 'hip' | 'knee' | 'ankle';
 

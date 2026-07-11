@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { assetUrl } from './assetUrl';
-import { DebugCanvas } from './components/DebugCanvas';
+import { DebugCanvas, type GarmentOverlay } from './components/DebugCanvas';
 import { GarmentPicker } from './components/GarmentPicker';
 import { PerfStats } from './components/PerfStats';
 import { config } from './config';
@@ -11,6 +11,27 @@ import { usePipeline } from './hooks/usePipeline';
 import { useWebcam } from './hooks/useWebcam';
 import type { TryOnStatus } from './pipeline/compositor';
 import type { Accelerator, PipelineResult } from './pipeline/types';
+
+/** The loaded ImageBitmap(s) for the currently-selected garment — one for a
+ * single-piece garment, two for a lehenga-choli (choli + lehenga skirt). */
+type LoadedGarmentImages =
+  | { kind: 'single'; image: ImageBitmap }
+  | { kind: 'lehenga-choli'; choliImage: ImageBitmap; lehengaImage: ImageBitmap };
+
+async function fetchBitmap(path: string): Promise<ImageBitmap> {
+  const res = await fetch(assetUrl(path));
+  if (!res.ok) throw new Error(`fetch ${path} failed: ${res.status}`);
+  return createImageBitmap(await res.blob());
+}
+
+function closeGarmentImages(images: LoadedGarmentImages | null): void {
+  if (!images) return;
+  if (images.kind === 'single') images.image.close();
+  else {
+    images.choliImage.close();
+    images.lehengaImage.close();
+  }
+}
 
 type Mode = 'photo' | 'live';
 
@@ -28,12 +49,12 @@ export default function App() {
   const [showMask, setShowMask] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
   const [selectedGarment, setSelectedGarment] = useState<Garment | null>(null);
-  const [garmentBitmap, setGarmentBitmap] = useState<ImageBitmap | null>(null);
+  const [garmentImages, setGarmentImages] = useState<LoadedGarmentImages | null>(null);
   const [garmentError, setGarmentError] = useState<string | null>(null);
   const [tryOnStatus, setTryOnStatus] = useState<TryOnStatus | null>(null);
   const imageRef = useRef<ImageBitmap | null>(null);
   const resultRef = useRef<PipelineResult | null>(null);
-  const garmentBitmapRef = useRef<ImageBitmap | null>(null);
+  const garmentImagesRef = useRef<LoadedGarmentImages | null>(null);
 
   const run = useCallback(
     async (bitmap: ImageBitmap) => {
@@ -90,12 +111,14 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // Load the selected garment's PNG into an ImageBitmap for the compositor.
+  // Load the selected garment's PNG(s) into ImageBitmap(s) for the compositor
+  // — one image for a single-piece garment, two (choli + lehenga) for a
+  // lehenga-choli ensemble.
   useEffect(() => {
     if (!selectedGarment) {
-      garmentBitmapRef.current?.close();
-      garmentBitmapRef.current = null;
-      setGarmentBitmap(null);
+      closeGarmentImages(garmentImagesRef.current);
+      garmentImagesRef.current = null;
+      setGarmentImages(null);
       setGarmentError(null);
       return;
     }
@@ -103,16 +126,21 @@ export default function App() {
     setGarmentError(null);
     void (async () => {
       try {
-        const res = await fetch(assetUrl(selectedGarment.image));
-        if (!res.ok) throw new Error(`fetch ${selectedGarment.image} failed: ${res.status}`);
-        const bitmap = await createImageBitmap(await res.blob());
+        const next: LoadedGarmentImages =
+          selectedGarment.category === 'lehenga-choli'
+            ? {
+                kind: 'lehenga-choli',
+                choliImage: await fetchBitmap(selectedGarment.choli.image),
+                lehengaImage: await fetchBitmap(selectedGarment.lehenga.image),
+              }
+            : { kind: 'single', image: await fetchBitmap(selectedGarment.image) };
         if (cancelled) {
-          bitmap.close();
+          closeGarmentImages(next);
           return;
         }
-        garmentBitmapRef.current?.close();
-        garmentBitmapRef.current = bitmap;
-        setGarmentBitmap(bitmap);
+        closeGarmentImages(garmentImagesRef.current);
+        garmentImagesRef.current = next;
+        setGarmentImages(next);
       } catch (err) {
         if (!cancelled) setGarmentError(err instanceof Error ? err.message : String(err));
       }
@@ -138,13 +166,31 @@ export default function App() {
     void loadBitmap(await res.blob());
   };
 
-  const garmentOverlay = useMemo(
-    () =>
-      selectedGarment && garmentBitmap
-        ? { image: garmentBitmap, anchors: selectedGarment.anchors, hemLength: selectedGarment.meta.length }
-        : null,
-    [selectedGarment, garmentBitmap],
-  );
+  const garmentOverlay = useMemo((): GarmentOverlay | null => {
+    if (!selectedGarment || !garmentImages) return null;
+    if (selectedGarment.category === 'lehenga-choli' && garmentImages.kind === 'lehenga-choli') {
+      return {
+        kind: 'lehenga-choli',
+        choliImage: garmentImages.choliImage,
+        choliAnchors: selectedGarment.choli.anchors,
+        lehengaImage: garmentImages.lehengaImage,
+        lehengaAnchors: selectedGarment.lehenga.anchors,
+        skirtLength: selectedGarment.meta.length,
+      };
+    }
+    if (selectedGarment.category !== 'lehenga-choli' && garmentImages.kind === 'single') {
+      return {
+        kind: 'single',
+        image: garmentImages.image,
+        anchors: selectedGarment.anchors,
+        hemLength: selectedGarment.meta.length,
+      };
+    }
+    // Transient mismatch: selectedGarment just changed shape and the async
+    // image load for it hasn't landed yet — skip a render rather than pass
+    // mismatched data.
+    return null;
+  }, [selectedGarment, garmentImages]);
 
   const displayImage = mode === 'live' ? (live.latest?.frame ?? null) : image;
   const displayResult = mode === 'live' ? (live.latest?.result ?? null) : result;

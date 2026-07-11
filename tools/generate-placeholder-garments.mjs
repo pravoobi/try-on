@@ -105,6 +105,32 @@ function fillPolygon(buf, width, height, points, [r, g, b, a]) {
   }
 }
 
+/**
+ * A lehenga skirt has no shoulders — just a waistband flaring out to a
+ * (typically dramatic) hem. Separate from buildGarment's torso+neck+sleeve
+ * shape since the anchor set itself is different (waist/hem only, 4 points
+ * — see pipeline/types.ts SkirtAnchors).
+ */
+function buildSkirt(spec) {
+  const { width: W, height: H, centerX: cx, waistY, waistHalfWidth, hemY, hemHalfWidth, color, stripes } = spec;
+  const buf = Buffer.alloc(W * H * 4, 0);
+  const [r, g, b] = hexToRgb(color);
+  const fill = [r, g, b, 255];
+
+  const waistL = [cx - waistHalfWidth, waistY];
+  const waistR = [cx + waistHalfWidth, waistY];
+  const hemL = [cx - hemHalfWidth, hemY];
+  const hemR = [cx + hemHalfWidth, hemY];
+  fillPolygon(buf, W, H, [waistL, waistR, hemR, hemL], fill);
+
+  if (stripes) addStripes(buf, W, H, stripes.height, [r, g, b], stripes.alphaDelta);
+
+  return {
+    png: encodePng(W, H, buf),
+    anchors: { waistL, waistR, hemL, hemR },
+  };
+}
+
 function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
@@ -287,12 +313,49 @@ const GARMENTS = [
   },
 ];
 
+// A lehenga-choli is two independently-anchored pieces composited together
+// (see CLAUDE.md's garment difficulty order) — choli uses the same 6-anchor
+// torso shape as any "top", the skirt uses buildSkirt's 4-anchor waist/hem
+// shape. Colors are coordinated (gold choli, deep maroon skirt) for a
+// cohesive-looking placeholder ensemble.
+const LEHENGA_CHOLI = {
+  id: 'lehenga-choli-maroon-gold-01',
+  meta: { sleeves: 'half', length: 'ankle' },
+  choliSpec: {
+    width: 440,
+    height: 380,
+    centerX: 220,
+    shoulderY: 55,
+    shoulderHalfWidth: 90,
+    waistY: 200,
+    waistHalfWidth: 75,
+    hemY: 340,
+    hemHalfWidth: 78,
+    neckDepth: 40,
+    neckHalfWidth: 35,
+    sleeve: { dropOut: 30, lengthDown: 90, cuffIn: 10 },
+    color: '#c9a227',
+    stripes: null,
+  },
+  lehengaSpec: {
+    width: 700,
+    height: 900,
+    centerX: 350,
+    waistY: 40,
+    waistHalfWidth: 85,
+    hemY: 860,
+    hemHalfWidth: 320,
+    color: '#7a1f3d',
+    stripes: { height: 30, alphaDelta: 12 },
+  },
+};
+
 await mkdir(garmentsDir, { recursive: true });
 
 // Merge with catalog.json rather than overwrite it outright: real garments
 // annotated via tools/annotate.html (e.g. against tools/remove-background.html
 // cutouts) live in the same file and must survive a re-run of this script.
-const placeholderIds = new Set(GARMENTS.map((g) => g.id));
+const placeholderIds = new Set([...GARMENTS.map((g) => g.id), LEHENGA_CHOLI.id]);
 let existing = [];
 try {
   existing = JSON.parse(await readFile(catalogPath, 'utf8'));
@@ -311,6 +374,30 @@ for (const g of GARMENTS) {
   );
   generated.push({ id: g.id, category: g.category, image: `/garments/${file}`, anchors: rounded, meta: g.meta });
   console.log(`generated ${file} (${g.spec.width}x${g.spec.height})`);
+}
+
+{
+  const { id, meta, choliSpec, lehengaSpec } = LEHENGA_CHOLI;
+  const round = (anchors) =>
+    Object.fromEntries(Object.entries(anchors).map(([k, [x, y]]) => [k, [Math.round(x * 10) / 10, Math.round(y * 10) / 10]]));
+
+  const choli = buildGarment(choliSpec);
+  const choliFile = `${id}-choli.png`;
+  await writeFile(path.join(garmentsDir, choliFile), choli.png);
+  console.log(`generated ${choliFile} (${choliSpec.width}x${choliSpec.height})`);
+
+  const lehenga = buildSkirt(lehengaSpec);
+  const lehengaFile = `${id}-lehenga.png`;
+  await writeFile(path.join(garmentsDir, lehengaFile), lehenga.png);
+  console.log(`generated ${lehengaFile} (${lehengaSpec.width}x${lehengaSpec.height})`);
+
+  generated.push({
+    id,
+    category: 'lehenga-choli',
+    choli: { image: `/garments/${choliFile}`, anchors: round(choli.anchors) },
+    lehenga: { image: `/garments/${lehengaFile}`, anchors: round(lehenga.anchors) },
+    meta,
+  });
 }
 
 const catalog = [...generated, ...preserved];

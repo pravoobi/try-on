@@ -140,6 +140,64 @@
     }
   },
   {
+    "id": "lehenga-choli-maroon-gold-01",
+    "category": "lehenga-choli",
+    "choli": {
+      "image": "/garments/lehenga-choli-maroon-gold-01-choli.png",
+      "anchors": {
+        "shoulderL": [
+          130,
+          55
+        ],
+        "shoulderR": [
+          310,
+          55
+        ],
+        "waistL": [
+          145,
+          200
+        ],
+        "waistR": [
+          295,
+          200
+        ],
+        "hemL": [
+          142,
+          340
+        ],
+        "hemR": [
+          298,
+          340
+        ]
+      }
+    },
+    "lehenga": {
+      "image": "/garments/lehenga-choli-maroon-gold-01-lehenga.png",
+      "anchors": {
+        "waistL": [
+          265,
+          40
+        ],
+        "waistR": [
+          435,
+          40
+        ],
+        "hemL": [
+          30,
+          860
+        ],
+        "hemR": [
+          670,
+          860
+        ]
+      }
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
+    }
+  },
+  {
     "id": "dress-navy-sailor-01",
     "category": "dress",
     "image": "/garments/dress-navy-sailor-01.png",

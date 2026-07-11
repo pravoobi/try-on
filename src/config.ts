@@ -33,6 +33,13 @@ export const config = {
      * hem_y = hip_y + torsoHeight * multiplier, per meta.length.
      */
     hemFallbackMultiplier: { hip: 0.15, knee: 1.0, ankle: 1.9 },
+    /**
+     * Lehenga skirt hem half-width, as a multiple of the hip half-width — a
+     * flared skirt's hem is meant to be much wider than its waistband, unlike
+     * a fitted dress hem which hangs straight down at hip width (see
+     * anchorMapping.ts computeFlaredHem).
+     */
+    skirtFlare: { hip: 1, knee: 1.6, ankle: 2.3 },
   },
   /** TPS warp evaluation grid (see pipeline/warp.ts). */
   warpGrid: { cols: 16, rows: 24 },

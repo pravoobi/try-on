@@ -1,11 +1,13 @@
 /**
- * Maps detected body keypoints to the 6 named body-space anchor targets a
- * garment's TPS warp is fit to (see CLAUDE.md "Garment data model" —
- * shoulders direct, waist interpolated shoulder→hip, hem extrapolated below
- * hips per meta.length).
+ * Maps detected body keypoints to the body-space anchor targets a garment's
+ * TPS warp is fit to (see CLAUDE.md "Garment data model" — shoulders direct,
+ * waist interpolated shoulder→hip, hem extrapolated below hips per
+ * meta.length). Also covers the lehenga-choli case: the skirt's waistband
+ * shares the exact hip-line point the choli's own hem would use, so the two
+ * independently-warped pieces meet with no gap.
  */
 import { config } from '../config';
-import type { BodyAnchors, HemLength, Keypoint, KeypointName, Point } from './types';
+import type { BodyAnchors, HemLength, Keypoint, KeypointName, Point, SkirtAnchors } from './types';
 
 function findKeypoint(keypoints: readonly Keypoint[], name: KeypointName): Keypoint | undefined {
   return keypoints.find((k) => k.name === name);
@@ -21,45 +23,20 @@ const HEM_KEYPOINTS: Record<HemLength, readonly [KeypointName, KeypointName] | n
   ankle: ['left_ankle', 'right_ankle'],
 };
 
-interface HemContext {
+interface TorsoContext {
+  shoulderL: Point;
+  shoulderR: Point;
   hipL: Point;
   hipR: Point;
   torsoHeight: number;
 }
 
-function computeHem(
-  keypoints: readonly Keypoint[],
-  hemLength: HemLength,
-  ctx: HemContext,
-): [Point, Point] {
-  const pair = HEM_KEYPOINTS[hemLength];
-  if (pair) {
-    const l = findKeypoint(keypoints, pair[0]);
-    const r = findKeypoint(keypoints, pair[1]);
-    if (l && r && l.score >= config.minKeypointScore && r.score >= config.minKeypointScore) {
-      // Garment hangs from the hip line; only the keypoint's depth (y) is used.
-      return [
-        [ctx.hipL[0], l.y],
-        [ctx.hipR[0], r.y],
-      ];
-    }
-  }
-  const dy = ctx.torsoHeight * config.anchors.hemFallbackMultiplier[hemLength];
-  return [
-    [ctx.hipL[0], ctx.hipL[1] + dy],
-    [ctx.hipR[0], ctx.hipR[1] + dy],
-  ];
-}
-
 /**
- * Computes the 6 body-space anchor targets, or null if the torso isn't
- * confidently visible enough to anchor a garment (e.g. back-facing, heavily
- * occluded, or a non-person photo).
+ * Shared confidence gate + torso measurements used by every anchor-target
+ * computation. Returns null if the torso isn't confidently visible enough
+ * to anchor a garment (e.g. back-facing, heavily occluded, non-person photo).
  */
-export function computeBodyAnchors(
-  keypoints: readonly Keypoint[],
-  hemLength: HemLength,
-): BodyAnchors | null {
+function computeTorsoContext(keypoints: readonly Keypoint[]): TorsoContext | null {
   const ls = findKeypoint(keypoints, 'left_shoulder');
   const rs = findKeypoint(keypoints, 'right_shoulder');
   const lh = findKeypoint(keypoints, 'left_hip');
@@ -83,12 +60,102 @@ export function computeBodyAnchors(
   const hipL: Point = [lh.x, lh.y];
   const hipR: Point = [rh.x, rh.y];
   const torsoHeight = Math.abs((hipL[1] + hipR[1]) / 2 - (shoulderL[1] + shoulderR[1]) / 2);
+  return { shoulderL, shoulderR, hipL, hipR, torsoHeight };
+}
+
+/** Returns the [leftY, rightY] a hem/skirt-bottom should sit at, per the
+ * knee/ankle keypoint if confidently visible, else a hip-relative fallback. */
+function computeHemY(
+  keypoints: readonly Keypoint[],
+  hemLength: HemLength,
+  ctx: TorsoContext,
+): [number, number] {
+  const pair = HEM_KEYPOINTS[hemLength];
+  if (pair) {
+    const l = findKeypoint(keypoints, pair[0]);
+    const r = findKeypoint(keypoints, pair[1]);
+    if (l && r && l.score >= config.minKeypointScore && r.score >= config.minKeypointScore) {
+      return [l.y, r.y];
+    }
+  }
+  const dy = ctx.torsoHeight * config.anchors.hemFallbackMultiplier[hemLength];
+  return [ctx.hipL[1] + dy, ctx.hipR[1] + dy];
+}
+
+function computeHem(
+  keypoints: readonly Keypoint[],
+  hemLength: HemLength,
+  ctx: TorsoContext,
+): [Point, Point] {
+  // Garment hangs from the hip line: only the keypoint's depth (y) is used,
+  // x stays at the hips. Correct for a fitted dress/kurti hem, which follows
+  // the body silhouette rather than flaring outward.
+  const [ly, ry] = computeHemY(keypoints, hemLength, ctx);
+  return [
+    [ctx.hipL[0], ly],
+    [ctx.hipR[0], ry],
+  ];
+}
+
+/**
+ * Like computeHem, but flares the hem outward from the hips by
+ * config.anchors.skirtFlare[skirtLength] — a lehenga skirt's hem is
+ * dramatically wider than its waistband, unlike a fitted dress hem which
+ * hangs straight down. Collapsing it to hip-width (as computeHem does)
+ * mismatches the garment image's own wide flare badly enough that the TPS
+ * warp folds over itself.
+ */
+function computeFlaredHem(
+  keypoints: readonly Keypoint[],
+  skirtLength: HemLength,
+  ctx: TorsoContext,
+): [Point, Point] {
+  const [ly, ry] = computeHemY(keypoints, skirtLength, ctx);
+  const centerX = (ctx.hipL[0] + ctx.hipR[0]) / 2;
+  const hipHalfWidth = Math.abs(ctx.hipR[0] - ctx.hipL[0]) / 2;
+  const halfWidth = hipHalfWidth * config.anchors.skirtFlare[skirtLength];
+  const sign = Math.sign(ctx.hipL[0] - ctx.hipR[0]) || 1;
+  return [
+    [centerX + sign * halfWidth, ly],
+    [centerX - sign * halfWidth, ry],
+  ];
+}
+
+/**
+ * Computes the 6 body-space anchor targets, or null if the torso isn't
+ * confidently visible enough to anchor a garment.
+ */
+export function computeBodyAnchors(
+  keypoints: readonly Keypoint[],
+  hemLength: HemLength,
+): BodyAnchors | null {
+  const ctx = computeTorsoContext(keypoints);
+  if (!ctx) return null;
 
   const t = config.anchors.waistT;
-  const waistL: Point = [lerp(shoulderL[0], hipL[0], t), lerp(shoulderL[1], hipL[1], t)];
-  const waistR: Point = [lerp(shoulderR[0], hipR[0], t), lerp(shoulderR[1], hipR[1], t)];
+  const waistL: Point = [lerp(ctx.shoulderL[0], ctx.hipL[0], t), lerp(ctx.shoulderL[1], ctx.hipL[1], t)];
+  const waistR: Point = [lerp(ctx.shoulderR[0], ctx.hipR[0], t), lerp(ctx.shoulderR[1], ctx.hipR[1], t)];
 
-  const [hemL, hemR] = computeHem(keypoints, hemLength, { hipL, hipR, torsoHeight });
+  const [hemL, hemR] = computeHem(keypoints, hemLength, ctx);
 
-  return { shoulderL, shoulderR, waistL, waistR, hemL, hemR };
+  return { shoulderL: ctx.shoulderL, shoulderR: ctx.shoulderR, waistL, waistR, hemL, hemR };
+}
+
+/**
+ * Computes the lehenga skirt's body-space anchor targets (waist + hem only).
+ * The waistband is exactly the point computeBodyAnchors(keypoints, 'hip')
+ * would use as the choli's own hem — that shared point is what makes the
+ * two independently-warped pieces meet with no visible seam gap.
+ */
+export function computeLehengaSkirtBodyAnchors(
+  keypoints: readonly Keypoint[],
+  skirtLength: HemLength,
+): SkirtAnchors | null {
+  const ctx = computeTorsoContext(keypoints);
+  if (!ctx) return null;
+
+  const [waistL, waistR] = computeHem(keypoints, 'hip', ctx);
+  const [hemL, hemR] = computeFlaredHem(keypoints, skirtLength, ctx);
+
+  return { waistL, waistR, hemL, hemR };
 }

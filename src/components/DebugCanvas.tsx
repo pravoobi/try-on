@@ -1,14 +1,26 @@
 import { useEffect, useRef } from 'react';
 import { config } from '../config';
 import { renderFeatheredMask, tintMask } from '../pipeline/maskRender';
-import { renderTryOn, type TryOnStatus } from '../pipeline/compositor';
-import { SKELETON_EDGES, type GarmentAnchors, type HemLength, type KeypointName, type PipelineResult } from '../pipeline/types';
+import { renderLehengaCholiTryOn, renderTryOn, type TryOnStatus } from '../pipeline/compositor';
+import type {
+  GarmentAnchors,
+  HemLength,
+  KeypointName,
+  PipelineResult,
+  SkirtAnchors,
+} from '../pipeline/types';
+import { SKELETON_EDGES } from '../pipeline/types';
 
-export interface GarmentOverlay {
-  image: ImageBitmap;
-  anchors: GarmentAnchors;
-  hemLength: HemLength;
-}
+export type GarmentOverlay =
+  | { kind: 'single'; image: ImageBitmap; anchors: GarmentAnchors; hemLength: HemLength }
+  | {
+      kind: 'lehenga-choli';
+      choliImage: ImageBitmap;
+      choliAnchors: GarmentAnchors;
+      lehengaImage: ImageBitmap;
+      lehengaAnchors: SkirtAnchors;
+      skirtLength: HemLength;
+    };
 
 interface Props {
   image: ImageBitmap;
@@ -35,14 +47,27 @@ export function DebugCanvas({ image, result, showMask, showSkeleton, garment, on
 
     let tryOnStatus: TryOnStatus | null = null;
     if (garment && result) {
-      tryOnStatus = renderTryOn(ctx, {
-        frame: image,
-        maskBitmap: result.maskBitmap,
-        keypoints: result.keypoints,
-        garmentImage: garment.image,
-        garmentAnchors: garment.anchors,
-        hemLength: garment.hemLength,
-      });
+      if (garment.kind === 'single') {
+        tryOnStatus = renderTryOn(ctx, {
+          frame: image,
+          maskBitmap: result.maskBitmap,
+          keypoints: result.keypoints,
+          garmentImage: garment.image,
+          garmentAnchors: garment.anchors,
+          hemLength: garment.hemLength,
+        });
+      } else {
+        tryOnStatus = renderLehengaCholiTryOn(ctx, {
+          frame: image,
+          maskBitmap: result.maskBitmap,
+          keypoints: result.keypoints,
+          choliImage: garment.choliImage,
+          choliAnchors: garment.choliAnchors,
+          lehengaImage: garment.lehengaImage,
+          lehengaAnchors: garment.lehengaAnchors,
+          skirtLength: garment.skirtLength,
+        });
+      }
     } else {
       ctx.clearRect(0, 0, w, h);
       ctx.drawImage(image, 0, 0);

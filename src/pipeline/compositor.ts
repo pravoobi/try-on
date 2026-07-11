@@ -3,10 +3,23 @@
  * to the feathered person mask, so fabric never spills onto the background)
  * → arm-occlusion patches (approximate "arms in front of fabric" — see
  * CLAUDE.md Phase 2 occlusion note).
+ *
+ * Also covers the lehenga-choli case (renderLehengaCholiTryOn): two
+ * independently-photographed pieces, each warped on its own anchor set and
+ * composited before the mask clip — see CLAUDE.md's garment difficulty
+ * order ("treat as two garments... composite both").
  */
-import { computeBodyAnchors } from './anchorMapping';
+import { computeBodyAnchors, computeLehengaSkirtBodyAnchors } from './anchorMapping';
 import { clipToMask, renderFeatheredMask } from './maskRender';
-import { ANCHOR_NAMES, type GarmentAnchors, type HemLength, type Keypoint, type Point } from './types';
+import {
+  ANCHOR_NAMES,
+  SKIRT_ANCHOR_NAMES,
+  type GarmentAnchors,
+  type HemLength,
+  type Keypoint,
+  type Point,
+  type SkirtAnchors,
+} from './types';
 import { renderGarmentWarp, type WarpGridOptions } from './warp';
 
 type Canvas2DContext = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
@@ -60,6 +73,64 @@ export function renderTryOn(ctx: Canvas2DContext, input: TryOnInput): TryOnStatu
 
   if (input.armOcclusion !== false) {
     drawArmOcclusion(ctx, frame, keypoints, bodyAnchors, input.armOcclusionRadiusFactor ?? 0.14);
+  }
+
+  return 'ok';
+}
+
+export interface LehengaCholiTryOnInput {
+  frame: ImageBitmap;
+  maskBitmap: ImageBitmap;
+  keypoints: readonly Keypoint[];
+  choliImage: CanvasImageSource & { width: number; height: number };
+  choliAnchors: GarmentAnchors;
+  lehengaImage: CanvasImageSource & { width: number; height: number };
+  lehengaAnchors: SkirtAnchors;
+  /** The lehenga's hem length (knee/ankle) — the choli's own hem is always the natural waistline. */
+  skirtLength: HemLength;
+  warpGrid?: WarpGridOptions;
+  armOcclusion?: boolean;
+  armOcclusionRadiusFactor?: number;
+}
+
+/**
+ * Same idea as renderTryOn but for a two-piece lehenga-choli: the skirt is
+ * warped and drawn first, the choli on top of it (so the choli's hem
+ * covers the waist seam), both clipped to the mask as one combined layer.
+ */
+export function renderLehengaCholiTryOn(ctx: Canvas2DContext, input: LehengaCholiTryOnInput): TryOnStatus {
+  const { frame, maskBitmap, keypoints, choliImage, choliAnchors, lehengaImage, lehengaAnchors, skirtLength } = input;
+  const w = frame.width;
+  const h = frame.height;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(frame, 0, 0);
+
+  const choliBody = computeBodyAnchors(keypoints, 'hip');
+  if (!choliBody) return 'pose-not-anchorable';
+  const skirtBody = computeLehengaSkirtBodyAnchors(keypoints, skirtLength);
+  if (!skirtBody) return 'pose-not-anchorable';
+
+  const choliSrc: Point[] = ANCHOR_NAMES.map((n) => choliAnchors[n]);
+  const choliDst: Point[] = ANCHOR_NAMES.map((n) => choliBody[n]);
+  const skirtSrc: Point[] = SKIRT_ANCHOR_NAMES.map((n) => lehengaAnchors[n]);
+  const skirtDst: Point[] = SKIRT_ANCHOR_NAMES.map((n) => skirtBody[n]);
+
+  const lehengaLayer = renderGarmentWarp(lehengaImage, skirtSrc, skirtDst, w, h, input.warpGrid);
+  const choliLayer = renderGarmentWarp(choliImage, choliSrc, choliDst, w, h, input.warpGrid);
+
+  const combined = new OffscreenCanvas(w, h);
+  const combinedCtx = combined.getContext('2d');
+  if (!combinedCtx) throw new Error('renderLehengaCholiTryOn: no 2d context');
+  combinedCtx.drawImage(lehengaLayer, 0, 0);
+  combinedCtx.drawImage(choliLayer, 0, 0);
+
+  const feathered = renderFeatheredMask(maskBitmap, w, h);
+  const clipped = clipToMask(combined, w, h, feathered);
+  ctx.drawImage(clipped, 0, 0);
+
+  if (input.armOcclusion !== false) {
+    drawArmOcclusion(ctx, frame, keypoints, choliBody, input.armOcclusionRadiusFactor ?? 0.14);
   }
 
   return 'ok';

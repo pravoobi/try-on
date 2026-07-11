@@ -23,7 +23,7 @@ export function GarmentPicker({ garments, selectedId, onSelect }: Props) {
           onClick={() => onSelect(g)}
           title={`${g.id} (${g.category}, ${g.meta.sleeves}, ${g.meta.length}-length)`}
         >
-          <img src={assetUrl(g.image)} alt={g.id} />
+          <img src={assetUrl(g.category === 'lehenga-choli' ? g.choli.image : g.image)} alt={g.id} />
         </button>
       ))}
     </div>
