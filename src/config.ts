@@ -26,8 +26,21 @@ export const config = {
     'photo-05.jpg',
   ],
   anchors: {
+    /**
+     * MoveNet keypoints sit at skeletal joints, inside the visual body
+     * silhouette — garment anchor targets are widened outward from the
+     * joint pair's midpoint so fabric reaches the body's edges. Overflow
+     * past the silhouette is clipped to the person mask, so err wide.
+     */
+    widthScale: { shoulder: 1.15, hip: 1.45 },
+    /**
+     * Raise shoulder targets by this fraction of torso height — garment
+     * shoulder seams sit on top of the shoulder, the keypoint at the joint
+     * center below it.
+     */
+    shoulderLift: 0.05,
     /** Fraction of the way from shoulder to hip where the waist anchor sits. */
-    waistT: 0.55,
+    waistT: 0.62,
     /**
      * Hem placement when the knee/ankle keypoint is missing or unconfident:
      * hem_y = hip_y + torsoHeight * multiplier, per meta.length.
@@ -39,7 +52,7 @@ export const config = {
      * a fitted dress hem which hangs straight down at hip width (see
      * anchorMapping.ts computeFlaredHem).
      */
-    skirtFlare: { hip: 1, knee: 1.6, ankle: 2.3 },
+    skirtFlare: { hip: 1, knee: 1.9, ankle: 2.6 },
   },
   /** TPS warp evaluation grid (see pipeline/warp.ts). */
   warpGrid: { cols: 16, rows: 24 },

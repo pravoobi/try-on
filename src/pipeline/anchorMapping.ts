@@ -17,6 +17,16 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/** Pushes two points apart from their shared midpoint by `scale`. */
+function scalePairOutward(a: Point, b: Point, scale: number): [Point, Point] {
+  const cx = (a[0] + b[0]) / 2;
+  const cy = (a[1] + b[1]) / 2;
+  return [
+    [cx + (a[0] - cx) * scale, cy + (a[1] - cy) * scale],
+    [cx + (b[0] - cx) * scale, cy + (b[1] - cy) * scale],
+  ];
+}
+
 const HEM_KEYPOINTS: Record<HemLength, readonly [KeypointName, KeypointName] | null> = {
   hip: null,
   knee: ['left_knee', 'right_knee'],
@@ -55,11 +65,22 @@ function computeTorsoContext(keypoints: readonly Keypoint[]): TorsoContext | nul
     return null;
   }
 
-  const shoulderL: Point = [ls.x, ls.y];
-  const shoulderR: Point = [rs.x, rs.y];
-  const hipL: Point = [lh.x, lh.y];
-  const hipR: Point = [rh.x, rh.y];
-  const torsoHeight = Math.abs((hipL[1] + hipR[1]) / 2 - (shoulderL[1] + shoulderR[1]) / 2);
+  const torsoHeight = Math.abs((lh.y + rh.y) / 2 - (ls.y + rs.y) / 2);
+
+  // Keypoints sit at skeletal joints, well inside the clothed silhouette —
+  // anchoring fabric to the raw joints leaves skin strips at the shoulders
+  // and hips. Widen the targets to the body's visual edges and lift the
+  // shoulder targets to the top of the shoulder (the joint center is below
+  // the seam line). Overflow past the silhouette is clipped to the person
+  // mask downstream, so erring wide is safe.
+  const lift = torsoHeight * config.anchors.shoulderLift;
+  const [shoulderL, shoulderR] = scalePairOutward(
+    [ls.x, ls.y - lift],
+    [rs.x, rs.y - lift],
+    config.anchors.widthScale.shoulder,
+  );
+  const [hipL, hipR] = scalePairOutward([lh.x, lh.y], [rh.x, rh.y], config.anchors.widthScale.hip);
+
   return { shoulderL, shoulderR, hipL, hipR, torsoHeight };
 }
 
