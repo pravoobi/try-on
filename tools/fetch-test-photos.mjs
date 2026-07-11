@@ -45,6 +45,8 @@ const outDir = path.join(
   'test-photos',
 );
 const force = process.argv.includes('--force');
+const USER_AGENT = 'try-on-dev/0.1 (https://github.com/pravoobi/try-on; test photo fetch script)';
+const MAX_ATTEMPTS = 4;
 
 await mkdir(outDir, { recursive: true });
 
@@ -55,16 +57,31 @@ for (const { file, url, note } of PHOTOS) {
     continue;
   }
   process.stdout.write(`fetching ${file} (${note.split('—')[0].trim()}) ... `);
-  const res = await fetch(url, {
-    headers: { 'user-agent': 'try-on-dev/0.1 (test photo fetch script)' },
-  });
-  if (!res.ok) {
-    console.error(`FAILED: ${res.status} for ${url}`);
+  try {
+    const buf = await fetchWithRetry(url);
+    await writeFile(dest, buf);
+    console.log('ok');
+  } catch (err) {
+    console.error(`FAILED: ${err.message} for ${url}`);
     process.exitCode = 1;
-    continue;
   }
-  await writeFile(dest, Buffer.from(await res.arrayBuffer()));
-  console.log('ok');
+}
+
+/** Wikimedia rate-limits (429) fairly aggressively on shared CI IPs — retry with backoff. */
+async function fetchWithRetry(url) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(url, { headers: { 'user-agent': USER_AGENT } });
+    if (res.ok) return Buffer.from(await res.arrayBuffer());
+    if (res.status !== 429 || attempt === MAX_ATTEMPTS) {
+      throw new Error(String(res.status));
+    }
+    const retryAfterSec = Number(res.headers.get('retry-after'));
+    const delayMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
+      ? retryAfterSec * 1000
+      : 2 ** attempt * 1000;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  throw new Error('unreachable');
 }
 
 await writeFile(

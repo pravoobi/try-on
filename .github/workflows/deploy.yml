@@ -32,7 +32,12 @@ jobs:
       # unlike the garment PNGs/catalog, which are committed) — fetch them
       # before building, or the deployed site ships with no models.
       - run: npm run fetch-models
+      # Test photos are Wikimedia-hosted and just back the "quick load" demo
+      # buttons — not required for the app to function (upload/webcam still
+      # work). Wikimedia rate-limits shared CI IPs (429s); don't fail the
+      # whole deploy over a photo-fetch hiccup that the script already retries.
       - run: npm run fetch-test-photos
+        continue-on-error: true
 
       - run: npm run build
 
