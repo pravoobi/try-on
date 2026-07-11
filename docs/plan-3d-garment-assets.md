@@ -1,9 +1,9 @@
 # Plan: AI-powered 3D-ish garment assets (depth-augmented try-on, user-uploaded garments)
 
-**Status:** Phase A1 done (commit `c8b7adc`). Phases A2-A5 not started. This
-document is written for an implementing agent/model with access to this
-repo; it assumes CLAUDE.md has been read. Verify library APIs at build time
-— the browser-ML ecosystem moves fast.
+**Status:** Phases A1 (`c8b7adc`) and A2 (`7396edc`) done. Phases A3-A5 not
+started. This document is written for an implementing agent/model with
+access to this repo; it assumes CLAUDE.md has been read. Verify library APIs
+at build time — the browser-ML ecosystem moves fast.
 
 **Phase A1 implementation notes (for whoever builds A2+):**
 - `useAdvancedMode` (src/hooks/useAdvancedMode.ts) is the gate — `enabled`
@@ -27,6 +27,33 @@ repo; it assumes CLAUDE.md has been read. Verify library APIs at build time
   replacement, not a tint — A2's per-pixel occlusion and A3's relighting
   will need their own compositor-level access to the depth map (via
   `useAdvancedMode.estimateDepth`), not this debug overlay path.
+
+**Phase A2 implementation notes (for A3+):**
+- `applyDepthOcclusion` (pipeline/compositor.ts) is the depth-tested
+  occlusion path; `drawArmOcclusion` is now purely the simple-mode/no-depth
+  fallback. Both are chosen inside `renderTryOn`/`renderLehengaCholiTryOn`
+  based on whether `input.personDepth` was passed in — that's the only
+  branch point, so A3's relighting can hang off the same `personDepth`
+  input without touching the occlusion logic.
+- **Load-bearing gotcha, don't reintroduce this bug:** the depth field's
+  control points (what stands in for "the garment's own surface depth")
+  must be sampled at real on-body locations — the raw pose keypoints
+  (shoulders/hips), not the garment anchor targets (`bodyAnchors`/
+  `GarmentAnchors`). Phase A1 deliberately widens those anchor targets
+  past the body's own silhouette edge (`config.anchors.widthScale`, up to
+  1.45x at the hips) so fabric fully covers the mask-clipped region.
+  Sampling depth AT those widened points can land in the background,
+  which drags the whole interpolated depth surface down and makes nearly
+  the entire garment register as "person in front of it" — the garment
+  visually disappears, with no error or exception anywhere. If A3's
+  relighting or any future compositor code needs a "where is the body,
+  roughly" depth reference, reuse the same raw-keypoints approach, not
+  `bodyAnchors`.
+- The occlusion scan is bounded to an expanded torso bbox
+  (`config.depthOcclusion.bboxMarginFrac`), not the full frame — fine at
+  photo-mode resolutions/latencies, but if A5's live-mode throttling ends
+  up calling this per-frame, re-profile; a bbox scan plus a 4-point TPS
+  eval per pixel is cheap but not free at 15fps.
 
 ## 1. Problem statement (from the product owner)
 
