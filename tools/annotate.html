@@ -87,6 +87,12 @@
       Garment PNG
       <input type="file" id="fileInput" accept="image/png,image/*" />
     </label>
+    <label>...or load from URL (dev convenience)
+      <div class="row">
+        <input type="text" id="urlInput" placeholder="/garments/dress-x.png" style="flex:1;" />
+        <button id="loadUrlBtn">Load</button>
+      </div>
+    </label>
 
     <div id="status" class="pending">Load an image to begin.</div>
 
@@ -254,23 +260,40 @@
     });
   }
 
+  function onImageReady(image, fileName) {
+    img = image;
+    anchors = {};
+    placedOrder = [];
+    var maxW = 480, maxH = 720;
+    scale = Math.min(maxW / image.width, maxH / image.height, 1);
+    canvas.width = Math.round(image.width * scale);
+    canvas.height = Math.round(image.height * scale);
+    var base = fileName.replace(/\.[^.]+$/, '');
+    if (!idInput.value) idInput.value = base;
+    if (!imagePathInput.value) imagePathInput.value = '/garments/' + fileName;
+    draw();
+    updateStatus();
+  }
+
   function loadImage(file) {
     var url = URL.createObjectURL(file);
     var image = new Image();
     image.onload = function () {
-      img = image;
-      anchors = {};
-      placedOrder = [];
-      var maxW = 480, maxH = 720;
-      scale = Math.min(maxW / image.width, maxH / image.height, 1);
-      canvas.width = Math.round(image.width * scale);
-      canvas.height = Math.round(image.height * scale);
-      var base = file.name.replace(/\.[^.]+$/, '');
-      if (!idInput.value) idInput.value = base;
-      if (!imagePathInput.value) imagePathInput.value = '/garments/' + file.name;
-      draw();
-      updateStatus();
+      onImageReady(image, file.name);
       URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  }
+
+  function loadImageFromUrl(url) {
+    var image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = function () {
+      onImageReady(image, url.split('/').pop());
+    };
+    image.onerror = function () {
+      statusEl.textContent = 'Error: failed to load ' + url;
+      statusEl.className = 'pending';
     };
     image.src = url;
   }
@@ -336,6 +359,11 @@
   fileInput.addEventListener('change', function () {
     var file = fileInput.files && fileInput.files[0];
     if (file) loadImage(file);
+  });
+
+  document.getElementById('loadUrlBtn').addEventListener('click', function () {
+    var url = document.getElementById('urlInput').value.trim();
+    if (url) loadImageFromUrl(url);
   });
 
   function buildGarmentJson() {

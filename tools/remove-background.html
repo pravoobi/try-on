@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Garment background remover</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background: #111318;
+    color: #e5e7eb;
+    display: flex;
+    height: 100vh;
+  }
+  #main { flex: 1; overflow: auto; padding: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+  .pane { display: flex; flex-direction: column; gap: 0.4rem; }
+  .pane h2 { font-size: 0.8rem; margin: 0; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
+  canvas {
+    background-image:
+      linear-gradient(45deg, #2a2f3a 25%, transparent 25%), linear-gradient(-45deg, #2a2f3a 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #2a2f3a 75%), linear-gradient(-45deg, transparent 75%, #2a2f3a 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    border: 1px solid #374151;
+    max-width: 440px;
+    max-height: 78vh;
+    width: auto;
+    height: auto;
+  }
+  #sidebar { width: 320px; flex-shrink: 0; padding: 1rem; border-left: 1px solid #374151; display: flex; flex-direction: column; gap: 0.9rem; }
+  label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
+  input[type="file"], input[type="range"] { width: 100%; }
+  button {
+    background: #1f2430; color: #e5e7eb; border: 1px solid #374151; border-radius: 6px;
+    padding: 0.45rem 0.7rem; font: inherit; cursor: pointer;
+  }
+  button.primary { background: #2563eb; border-color: #2563eb; color: white; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .hint { font-size: 0.75rem; color: #9ca3af; }
+  .row { display: flex; justify-content: space-between; font-size: 0.75rem; color: #9ca3af; }
+</style>
+</head>
+<body>
+  <div id="main">
+    <div class="pane">
+      <h2>Source</h2>
+      <canvas id="srcCanvas"></canvas>
+    </div>
+    <div class="pane">
+      <h2>Background removed</h2>
+      <canvas id="outCanvas"></canvas>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <h1 style="font-size:1rem;margin:0;">Garment background remover</h1>
+    <p class="hint">
+      Loads a photo, samples background color from the 4 corners, and keys out
+      anything close to a bilinear-interpolated model of that background (handles
+      gradient backdrops, not just flat color). Tune the thresholds if edges look
+      wrong, then download.
+    </p>
+
+    <label>Photo
+      <input type="file" id="fileInput" accept="image/*" />
+    </label>
+    <label>...or load from URL (dev convenience)
+      <div style="display:flex; gap:0.4rem;">
+        <input type="text" id="urlInput" placeholder="/_scratch/photo.jpg" style="flex:1; background:#1f2430; color:#e5e7eb; border:1px solid #374151; border-radius:6px; padding:0.4rem 0.5rem;" />
+        <button id="loadUrlBtn">Load</button>
+      </div>
+    </label>
+
+    <label>
+      Low threshold (fully transparent below this distance): <span id="lowVal">18</span>
+      <input type="range" id="lowRange" min="0" max="120" value="18" />
+    </label>
+    <label>
+      High threshold (fully opaque above this distance): <span id="highVal">55</span>
+      <input type="range" id="highRange" min="0" max="160" value="55" />
+    </label>
+    <label>
+      Corner sample radius (px): <span id="radiusVal">8</span>
+      <input type="range" id="radiusRange" min="2" max="30" value="8" />
+    </label>
+
+    <div class="row"><span id="status">Load a photo to begin.</span></div>
+
+    <button id="downloadBtn" class="primary" disabled>Download PNG</button>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  const fileInput = document.getElementById('fileInput');
+  const srcCanvas = document.getElementById('srcCanvas');
+  const outCanvas = document.getElementById('outCanvas');
+  const lowRange = document.getElementById('lowRange');
+  const highRange = document.getElementById('highRange');
+  const radiusRange = document.getElementById('radiusRange');
+  const lowVal = document.getElementById('lowVal');
+  const highVal = document.getElementById('highVal');
+  const radiusVal = document.getElementById('radiusVal');
+  const statusEl = document.getElementById('status');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  let img = null;
+  let fileBase = 'garment';
+
+  function sampleCorner(data, width, height, cx, cy, r) {
+    let sr = 0, sg = 0, sb = 0, n = 0;
+    for (let y = cy - r; y <= cy + r; y++) {
+      for (let x = cx - r; x <= cx + r; x++) {
+        if (x < 0 || y < 0 || x >= width || y >= height) continue;
+        const i = (y * width + x) * 4;
+        sr += data[i]; sg += data[i + 1]; sb += data[i + 2]; n++;
+      }
+    }
+    return n ? [sr / n, sg / n, sb / n] : [0, 0, 0];
+  }
+
+  /**
+   * 3x3 box blur on the alpha channel only. JPEG compression noise near the
+   * threshold band otherwise produces salt-and-pepper alpha speckle (visible
+   * as a grainy edge once composited over a differently-colored body) —
+   * this softens it without touching RGB or moving the silhouette edge much.
+   */
+  function despeckleAlpha(data, w, h) {
+    const src = new Uint8ClampedArray(data.length);
+    for (let i = 3; i < data.length; i += 4) src[i] = data[i];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let sum = 0, n = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            sum += src[(ny * w + nx) * 4 + 3];
+            n++;
+          }
+        }
+        data[(y * w + x) * 4 + 3] = Math.round(sum / n);
+      }
+    }
+  }
+
+  function process() {
+    if (!img) return;
+    const w = img.width, h = img.height;
+    srcCanvas.width = w; srcCanvas.height = h;
+    outCanvas.width = w; outCanvas.height = h;
+    const sctx = srcCanvas.getContext('2d');
+    sctx.drawImage(img, 0, 0);
+
+    const octx = outCanvas.getContext('2d');
+    octx.drawImage(img, 0, 0);
+    const imageData = octx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    const r = Number(radiusRange.value);
+    const low = Number(lowRange.value);
+    const high = Math.max(low + 1, Number(highRange.value));
+
+    const tl = sampleCorner(data, w, h, r, r, r);
+    const tr = sampleCorner(data, w, h, w - 1 - r, r, r);
+    const bl = sampleCorner(data, w, h, r, h - 1 - r, r);
+    const br = sampleCorner(data, w, h, w - 1 - r, h - 1 - r, r);
+
+    for (let y = 0; y < h; y++) {
+      const v = y / (h - 1);
+      for (let x = 0; x < w; x++) {
+        const u = x / (w - 1);
+        const i = (y * w + x) * 4;
+        const topR = tl[0] * (1 - u) + tr[0] * u;
+        const topG = tl[1] * (1 - u) + tr[1] * u;
+        const topB = tl[2] * (1 - u) + tr[2] * u;
+        const botR = bl[0] * (1 - u) + br[0] * u;
+        const botG = bl[1] * (1 - u) + br[1] * u;
+        const botB = bl[2] * (1 - u) + br[2] * u;
+        const bgR = topR * (1 - v) + botR * v;
+        const bgG = topG * (1 - v) + botG * v;
+        const bgB = topB * (1 - v) + botB * v;
+        const dr = data[i] - bgR, dg = data[i + 1] - bgG, db = data[i + 2] - bgB;
+        const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+        let alpha;
+        if (dist <= low) alpha = 0;
+        else if (dist >= high) alpha = 255;
+        else alpha = Math.round((255 * (dist - low)) / (high - low));
+        data[i + 3] = alpha;
+      }
+    }
+    despeckleAlpha(data, w, h);
+    octx.putImageData(imageData, 0, 0);
+    statusEl.textContent = `${w}x${h} — adjust thresholds and re-check edges before downloading.`;
+    downloadBtn.disabled = false;
+  }
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    fileBase = file.name.replace(/\.[^.]+$/, '');
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      img = image;
+      process();
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  });
+
+  document.getElementById('loadUrlBtn').addEventListener('click', () => {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) return;
+    fileBase = url.split('/').pop().replace(/\.[^.]+$/, '');
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      img = image;
+      process();
+    };
+    image.onerror = () => { statusEl.textContent = 'failed to load ' + url; };
+    image.src = url;
+  });
+
+  [lowRange, highRange, radiusRange].forEach((el) => {
+    el.addEventListener('input', () => {
+      lowVal.textContent = lowRange.value;
+      highVal.textContent = highRange.value;
+      radiusVal.textContent = radiusRange.value;
+      process();
+    });
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    outCanvas.toBlob((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileBase + '-cutout.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  });
+})();
+</script>
+</body>
+</html>

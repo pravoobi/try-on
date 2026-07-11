@@ -138,5 +138,75 @@
       "sleeves": "sleeveless",
       "length": "ankle"
     }
+  },
+  {
+    "id": "dress-navy-sailor-01",
+    "category": "dress",
+    "image": "/garments/dress-navy-sailor-01.png",
+    "anchors": {
+      "shoulderL": [
+        661.1,
+        -10.1
+      ],
+      "shoulderR": [
+        369.5,
+        -10.1
+      ],
+      "waistL": [
+        651.6,
+        314.7
+      ],
+      "waistR": [
+        345.7,
+        314.7
+      ],
+      "hemL": [
+        699,
+        1023.6
+      ],
+      "hemR": [
+        286.5,
+        1023.6
+      ]
+    },
+    "meta": {
+      "sleeves": "full",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "top-cowlneck-sweater-01",
+    "category": "top",
+    "image": "/garments/top-cowlneck-sweater-01.png",
+    "anchors": {
+      "shoulderL": [
+        708.7,
+        72
+      ],
+      "shoulderR": [
+        268.7,
+        72
+      ],
+      "waistL": [
+        680.7,
+        330
+      ],
+      "waistR": [
+        286.7,
+        330
+      ],
+      "hemL": [
+        574.7,
+        640
+      ],
+      "hemR": [
+        354.7,
+        640
+      ]
+    },
+    "meta": {
+      "sleeves": "full",
+      "length": "hip"
+    }
   }
 ]

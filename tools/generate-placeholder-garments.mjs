@@ -11,7 +11,7 @@
  * No image-library dependency: hand-rolled PNG encoder (zlib is built into
  * Node) + a scanline polygon fill that handles the concave V-neck outline.
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
@@ -289,7 +289,19 @@ const GARMENTS = [
 
 await mkdir(garmentsDir, { recursive: true });
 
-const catalog = [];
+// Merge with catalog.json rather than overwrite it outright: real garments
+// annotated via tools/annotate.html (e.g. against tools/remove-background.html
+// cutouts) live in the same file and must survive a re-run of this script.
+const placeholderIds = new Set(GARMENTS.map((g) => g.id));
+let existing = [];
+try {
+  existing = JSON.parse(await readFile(catalogPath, 'utf8'));
+} catch {
+  // no existing catalog yet — fine, this is a fresh run
+}
+const preserved = existing.filter((entry) => !placeholderIds.has(entry.id));
+
+const generated = [];
 for (const g of GARMENTS) {
   const { png, anchors } = buildGarment(g.spec);
   const file = `${g.id}.png`;
@@ -297,9 +309,12 @@ for (const g of GARMENTS) {
   const rounded = Object.fromEntries(
     Object.entries(anchors).map(([k, [x, y]]) => [k, [Math.round(x * 10) / 10, Math.round(y * 10) / 10]]),
   );
-  catalog.push({ id: g.id, category: g.category, image: `/garments/${file}`, anchors: rounded, meta: g.meta });
+  generated.push({ id: g.id, category: g.category, image: `/garments/${file}`, anchors: rounded, meta: g.meta });
   console.log(`generated ${file} (${g.spec.width}x${g.spec.height})`);
 }
 
+const catalog = [...generated, ...preserved];
 await writeFile(catalogPath, JSON.stringify(catalog, null, 2) + '\n');
-console.log(`wrote ${catalog.length} entries -> src/garments/catalog.json`);
+console.log(
+  `wrote ${catalog.length} entries -> src/garments/catalog.json (${generated.length} placeholder, ${preserved.length} preserved)`,
+);
