@@ -1,9 +1,11 @@
 # Plan: AI-powered 3D-ish garment assets (depth-augmented try-on, user-uploaded garments)
 
-**Status:** Phases A1 (`c8b7adc`) and A2 (`7396edc`) done. Phases A3-A5 not
-started. This document is written for an implementing agent/model with
-access to this repo; it assumes CLAUDE.md has been read. Verify library APIs
-at build time — the browser-ML ecosystem moves fast.
+**Status:** Phases A1 (`c8b7adc`), A2 (`7396edc`), and A3 (`afee4a1`, which
+also reworked A2's occlusion reference — see the A2 notes below, updated to
+match) are done. Phases A4-A5 not started. This document is written for an
+implementing agent/model with access to this repo; it assumes CLAUDE.md has
+been read. Verify library APIs at build time — the browser-ML ecosystem
+moves fast.
 
 **Phase A1 implementation notes (for whoever builds A2+):**
 - `useAdvancedMode` (src/hooks/useAdvancedMode.ts) is the gate — `enabled`
@@ -28,32 +30,75 @@ at build time — the browser-ML ecosystem moves fast.
   will need their own compositor-level access to the depth map (via
   `useAdvancedMode.estimateDepth`), not this debug overlay path.
 
-**Phase A2 implementation notes (for A3+):**
+**Phase A2 implementation notes (updated after Phase A3's occlusion rework):**
 - `applyDepthOcclusion` (pipeline/compositor.ts) is the depth-tested
   occlusion path; `drawArmOcclusion` is now purely the simple-mode/no-depth
   fallback. Both are chosen inside `renderTryOn`/`renderLehengaCholiTryOn`
-  based on whether `input.personDepth` was passed in — that's the only
-  branch point, so A3's relighting can hang off the same `personDepth`
-  input without touching the occlusion logic.
-- **Load-bearing gotcha, don't reintroduce this bug:** the depth field's
-  control points (what stands in for "the garment's own surface depth")
-  must be sampled at real on-body locations — the raw pose keypoints
-  (shoulders/hips), not the garment anchor targets (`bodyAnchors`/
-  `GarmentAnchors`). Phase A1 deliberately widens those anchor targets
-  past the body's own silhouette edge (`config.anchors.widthScale`, up to
-  1.45x at the hips) so fabric fully covers the mask-clipped region.
-  Sampling depth AT those widened points can land in the background,
-  which drags the whole interpolated depth surface down and makes nearly
-  the entire garment register as "person in front of it" — the garment
-  visually disappears, with no error or exception anywhere. If A3's
-  relighting or any future compositor code needs a "where is the body,
-  roughly" depth reference, reuse the same raw-keypoints approach, not
-  `bodyAnchors`.
+  based on whether `input.personDepth` was passed in.
+- The reference "garment surface depth" must come from real on-body
+  locations, never the garment anchor targets (`bodyAnchors`/
+  `GarmentAnchors`) — Phase A1 deliberately widens those past the body's
+  own silhouette edge (`config.anchors.widthScale`, up to 1.45x at the
+  hips) so fabric fully covers the mask-clipped region, and sampling depth
+  there can land in the background.
+- **Second load-bearing gotcha (found during A3 verification, don't
+  reintroduce): the reference must also be statistically robust, not a
+  smooth fit through a handful of sparse points.** The original A2 design
+  built a TPS surface through just the 4 raw keypoints (shoulders/hips).
+  TPS is a *global* interpolant — a single anomalous sample (e.g. a
+  shoulder keypoint landing exactly on a strap or shadow edge, a real
+  local depth feature, not noise) drags the *entire* smooth surface down
+  across a wide area, with no error or exception. Confirmed with a real
+  photo: one shoulder sample sat ~40 gray levels below the other three,
+  which was enough to falsely mark a large fraction of the torso as
+  "person in front" and reveal the person's actual (printed) shirt through
+  the garment. Separately, monocular depth estimation also genuinely
+  misjudges high-contrast prints/patterns as height variation, compounding
+  the problem. The fix (now in place): sample a dense grid across the
+  torso interior (bilinear between the 4 keypoints, ~16 points) and take
+  the *median* as a single constant reference, plus a box blur
+  (`config.depthOcclusion.blurRadiusPx`) on the comparison depth field to
+  suppress the print-driven high-frequency noise a real arm-in-front
+  discontinuity doesn't have. If you touch this function, keep both: blur
+  alone doesn't fix a single-sample outlier, and a robust reference alone
+  doesn't fix per-pixel print noise.
+- Trade-off worth knowing: the reference is now a single constant across
+  the whole torso bbox, not a spatially-varying field — simpler and far
+  more robust, but it won't follow a genuine front-to-back lean (e.g. hips
+  measurably closer to camera than shoulders). Untested against strongly
+  leaning poses; revisit if that turns out to matter.
 - The occlusion scan is bounded to an expanded torso bbox
   (`config.depthOcclusion.bboxMarginFrac`), not the full frame — fine at
   photo-mode resolutions/latencies, but if A5's live-mode throttling ends
-  up calling this per-frame, re-profile; a bbox scan plus a 4-point TPS
-  eval per pixel is cheap but not free at 15fps.
+  up calling this per-frame, re-profile; the box blur is O(w×h) (separable,
+  not O(w×h×radius²)) but still real work at 15fps.
+
+**Phase A3 implementation notes (for A4/A5):**
+- New modules: `pipeline/normalMap.ts` (`depthToNormalMap`, pure
+  synchronous Sobel-style math, no model inference) and `pipeline/
+  relight.ts` (`estimateLight`, `applyGarmentShading`).
+- Normal maps are computed once per garment selection in App.tsx, alongside
+  the existing garment depth (reuses the SAME depth result — no extra
+  `estimateDepth` call). For a lehenga-choli, each piece needs its own
+  normal map since they're separate photos; see the `GarmentNormals` type
+  and the effect that produces it.
+- `estimateLight` is cheap enough (bounded to a 128px-max working canvas)
+  to call fresh on every render inside the compositor — unlike depth, it
+  needs no React-side caching/state.
+- The "shading" checkbox is the A/B toggle the plan's done-when asks for.
+  It's implemented by omitting the normal map(s) from `GarmentOverlay` when
+  unchecked (see App.tsx's `garmentOverlay` memo), not by adding a boolean
+  flag through the compositor — mirrors how `personDepth` already gates
+  A2's occlusion.
+- Emergent behavior worth knowing about, not a bug: depth-estimating a
+  garment with a bold print or the skirt's stripe pattern produces a
+  normal map with fake "relief" following that pattern (the depth model
+  reads high-contrast print edges as height variation, same failure mode
+  noted in the A2 gotcha above). The shaded result then shows the print's
+  shape as a subtle emboss/fold-line effect. This looks good for the
+  current placeholder/real assets tested and is arguably a desirable side
+  effect, but it isn't real fabric geometry — don't be surprised by it,
+  and don't rely on it being *consistent* across different garment photos.
 
 ## 1. Problem statement (from the product owner)
 
