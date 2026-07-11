@@ -1,11 +1,11 @@
 # Plan: AI-powered 3D-ish garment assets (depth-augmented try-on, user-uploaded garments)
 
-**Status:** Phases A1 (`c8b7adc`), A2 (`7396edc`), and A3 (`afee4a1`, which
-also reworked A2's occlusion reference — see the A2 notes below, updated to
-match) are done. Phases A4-A5 not started. This document is written for an
-implementing agent/model with access to this repo; it assumes CLAUDE.md has
-been read. Verify library APIs at build time — the browser-ML ecosystem
-moves fast.
+**Status:** Phases A1 (`c8b7adc`), A2 (`7396edc`), A3 (`afee4a1`, which also
+reworked A2's occlusion reference — see the A2 notes below, updated to
+match), and A4 (user garment upload) are done. Phase A5 not started. This
+document is written for an implementing agent/model with access to this
+repo; it assumes CLAUDE.md has been read. Verify library APIs at build time
+— the browser-ML ecosystem moves fast.
 
 **Phase A1 implementation notes (for whoever builds A2+):**
 - `useAdvancedMode` (src/hooks/useAdvancedMode.ts) is the gate — `enabled`
@@ -99,6 +99,56 @@ moves fast.
   current placeholder/real assets tested and is arguably a desirable side
   effect, but it isn't real fabric geometry — don't be surprised by it,
   and don't rely on it being *consistent* across different garment photos.
+
+**Phase A4 implementation notes (for A5):**
+- Matting is a *second*, independently-lazy model gate from A1's depth
+  infrastructure — `useMatting` (src/hooks/useMatting.ts) creates
+  `matting.worker.ts` (`@huggingface/transformers`'
+  `'background-removal'` task, default model `Xenova/modnet`) only when the
+  upload panel is actually opened, and tears it down (`enabled=false`) the
+  moment the panel closes. Unlike `useAdvancedMode`, this isn't a standing
+  user preference — no localStorage persistence — since most sessions will
+  open the upload flow at most once.
+- `'background-removal'`'s pipeline output already has real alpha
+  transparency applied (`RawImage.putAlpha` internally) — no separate
+  mask-then-composite step needed on our side, just `.toCanvas()` →
+  `createImageBitmap()` straight to the main thread.
+- `pipeline/autoAnchor.ts` is pure-function + canvas-touching but
+  React-free, per the pipeline/ convention: `findAlphaBBox`/`rowExtents`
+  operate on a raw `Uint8ClampedArray` (unit-tested in isolation);
+  `cropToAlphaBBox` and `suggestAnchors` are the two callers that touch
+  `OffscreenCanvas`/`ImageBitmap`. Shoulders = widest row in the top band;
+  hem = bottom-band average (robust to a stray pixel); waist = narrowest
+  row between them, falling back to a straight shoulder→hem interpolation
+  when the garment has no real taper (a boxy tee) rather than trusting a
+  noisy "narrowest pixel" on a straight-cut silhouette.
+- **L/R convention gotcha:** auto-suggested anchors use image-left/right
+  (smaller x = `...L`), matching the existing hand-annotated
+  `catalog.json` convention — *not* the anatomical "wearer's own left"
+  convention `tools/annotate.html`'s comments describe (that's about body
+  keypoints, a different coordinate space). Verified against real catalog
+  data before writing the auto-suggest logic; getting this backwards would
+  silently mirror every auto-suggested anchor set relative to hand-annotated
+  ones.
+- User uploads are unified with catalog garments through the exact same
+  `Garment`/`GarmentPicker`/`fetchBitmap` code paths with zero
+  special-casing, via two small tricks: `assetUrl()` passes any absolute
+  URL through unchanged (a regex check), and uploaded images are persisted
+  in IndexedDB as Blobs (`garments/userGarmentStore.ts`) then exposed as
+  `blob:` object URLs at load time (`hooks/useUserGarments.ts`). Both URL
+  schemes flow through identical `fetch()`/`<img src>` calls downstream —
+  `GarmentPicker.tsx` required no changes for A4.
+- Verified end-to-end in Chrome with synthetic "phone photo of a shirt on a
+  bed" test images (opaque noisy background + solid silhouette, generated
+  in-page via canvas since no real phone photo was available): front-only
+  upload (skip back) and front+back upload both complete in well under 60s
+  from file-select to picker auto-select, including the ~500KB model
+  download on first use (instant on repeat opens — the browser HTTP cache
+  covers the model weights). Anchor auto-suggestion landed correctly on the
+  synthetic silhouette without manual adjustment; drag-adjust, category/
+  sleeve/length selects, IndexedDB persistence across a full page reload,
+  and try-on compositing (identical code path to catalog garments) all
+  confirmed working with no console errors.
 
 ## 1. Problem statement (from the product owner)
 

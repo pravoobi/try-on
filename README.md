@@ -47,17 +47,6 @@ Both models run in a Web Worker; only mask/keypoint results and transferred
 `ImageBitmap`s cross back to the main thread — the video frame itself never
 touches the network layer, this is the whole "privacy" pitch made literal.
 
-## Status
-
-| Phase | What | Status |
-|---|---|---|
-| 1 | Segmentation + pose on a static photo, WebGPU confirmed, CPU fallback | ✅ |
-| 2 | TPS garment warp + compositor, verified on 3 poses | ✅ |
-| 3 | Live webcam, throttled inference, keypoint smoothing | ✅ |
-| 4 | Perf UI polish, README, static deploy | ✅ (this) |
-| — | Sarees (draped, not fitted — needs a different approach entirely) | deferred |
-
-See `CLAUDE.md` for the full build plan and the gotchas that shaped it.
 
 ## Try it
 
