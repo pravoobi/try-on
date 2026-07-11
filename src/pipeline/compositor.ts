@@ -10,7 +10,7 @@
  * order ("treat as two garments... composite both").
  */
 import { computeBodyAnchors, computeLehengaSkirtBodyAnchors } from './anchorMapping';
-import { clipToMask, renderFeatheredMask } from './maskRender';
+import { clipToMask, openMaskBelow, renderFeatheredMask } from './maskRender';
 import {
   ANCHOR_NAMES,
   SKIRT_ANCHOR_NAMES,
@@ -68,7 +68,20 @@ export function renderTryOn(ctx: Canvas2DContext, input: TryOnInput): TryOnStatu
   );
 
   const feathered = renderFeatheredMask(maskBitmap, w, h);
-  const clipped = clipToMask(garmentLayer, w, h, feathered);
+  // A hip-length top is fitted everywhere, so the person mask clips all of
+  // it; a knee/ankle garment hangs free below the waist — open the clip
+  // there so the hem drapes over the background and the gap between legs.
+  const waistY = (bodyAnchors.waistL[1] + bodyAnchors.waistR[1]) / 2;
+  const hemY = (bodyAnchors.hemL[1] + bodyAnchors.hemR[1]) / 2;
+  const skirtLen = hemY - waistY;
+  // Open blend is generous (fitted at the waist, free by mid-thigh); the
+  // hem cut is tight — junk in background-removed garment photos (the
+  // original model's shoes) starts right at the hem line.
+  const clipMask =
+    hemLength === 'hip'
+      ? feathered
+      : openMaskBelow(feathered, waistY, skirtLen * 0.2, hemY + skirtLen * 0.03, skirtLen * 0.05);
+  const clipped = clipToMask(garmentLayer, w, h, clipMask);
   ctx.drawImage(clipped, 0, 0);
 
   if (input.armOcclusion !== false) {
@@ -126,7 +139,20 @@ export function renderLehengaCholiTryOn(ctx: Canvas2DContext, input: LehengaChol
   combinedCtx.drawImage(choliLayer, 0, 0);
 
   const feathered = renderFeatheredMask(maskBitmap, w, h);
-  const clipped = clipToMask(combined, w, h, feathered);
+  // The skirt hangs free below its waistband — open the clip there so it
+  // drapes over the background and the gap between legs, instead of being
+  // shrink-wrapped to the leg silhouette. The choli above stays mask-clipped.
+  const skirtWaistY = (skirtBody.waistL[1] + skirtBody.waistR[1]) / 2;
+  const skirtHemY = (skirtBody.hemL[1] + skirtBody.hemR[1]) / 2;
+  const skirtLen = skirtHemY - skirtWaistY;
+  const clipMask = openMaskBelow(
+    feathered,
+    skirtWaistY,
+    skirtLen * 0.15,
+    skirtHemY + skirtLen * 0.03,
+    skirtLen * 0.05,
+  );
+  const clipped = clipToMask(combined, w, h, clipMask);
   ctx.drawImage(clipped, 0, 0);
 
   if (input.armOcclusion !== false) {
