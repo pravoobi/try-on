@@ -49,6 +49,13 @@ export interface SinglePieceGarment {
   category: Exclude<GarmentCategory, 'lehenga-choli'>;
   image: string;
   anchors: GarmentAnchors;
+  /**
+   * Optional back-view photo (Phase A4 user uploads; see
+   * docs/plan-3d-garment-assets.md §5.1). A garment's back is rendered only
+   * when this is present — never fabricated by mirroring the front (prints,
+   * necklines, and closures differ front-to-back).
+   */
+  back?: GarmentPiece;
   meta: GarmentMeta;
 }
 
@@ -168,6 +175,7 @@ export function validateGarment(data: unknown, index?: number): Garment {
     category: obj.category as Exclude<GarmentCategory, 'lehenga-choli'>,
     image: validateImagePath(obj.image, `${path}.image`),
     anchors: validateAnchors(obj.anchors, `${path}.anchors`),
+    ...(obj.back !== undefined ? { back: validatePiece(obj.back, `${path}.back`) } : {}),
     meta,
   };
 }

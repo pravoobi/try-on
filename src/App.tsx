@@ -3,6 +3,7 @@ import { assetUrl } from './assetUrl';
 import { BitmapCanvas } from './components/BitmapCanvas';
 import { DebugCanvas, type GarmentOverlay } from './components/DebugCanvas';
 import { GarmentPicker } from './components/GarmentPicker';
+import { GarmentUpload } from './components/GarmentUpload';
 import { PerfStats } from './components/PerfStats';
 import { config } from './config';
 import type { Garment } from './garments/schema';
@@ -10,6 +11,7 @@ import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
 import { useLiveTryOn } from './hooks/useLiveTryOn';
 import { usePipeline } from './hooks/usePipeline';
+import { useUserGarments } from './hooks/useUserGarments';
 import { useWebcam } from './hooks/useWebcam';
 import type { TryOnStatus } from './pipeline/compositor';
 import { depthToNormalMap } from './pipeline/normalMap';
@@ -50,6 +52,7 @@ export default function App() {
   const [accelerator, setAccelerator] = useState<Accelerator>('webgpu');
   const pipeline = usePipeline(accelerator);
   const catalog = useGarmentCatalog();
+  const userGarments = useUserGarments();
   const webcam = useWebcam();
   const live = useLiveTryOn(pipeline, webcam.videoEl, mode === 'live');
   const [image, setImage] = useState<ImageBitmap | null>(null);
@@ -337,6 +340,11 @@ export default function App() {
   const displayImage = mode === 'live' ? (live.latest?.frame ?? null) : image;
   const displayResult = mode === 'live' ? (live.latest?.result ?? null) : result;
 
+  const allGarments = useMemo(
+    (): Garment[] => (catalog.status === 'ready' ? [...catalog.garments, ...userGarments.garments] : []),
+    [catalog.status, catalog.garments, userGarments.garments],
+  );
+
   return (
     <div className="app">
       <header>
@@ -461,7 +469,7 @@ export default function App() {
         {catalog.status === 'error' && <span className="error">catalog error: {catalog.error}</span>}
         {catalog.status === 'ready' && (
           <GarmentPicker
-            garments={catalog.garments}
+            garments={allGarments}
             selectedId={selectedGarment?.id ?? null}
             onSelect={setSelectedGarment}
           />
@@ -472,6 +480,17 @@ export default function App() {
           </span>
         )}
       </div>
+
+      {userGarments.status === 'error' && (
+        <p className="error">user garment library error: {userGarments.error}</p>
+      )}
+
+      <GarmentUpload
+        onGarmentAdded={async (stored) => {
+          const garment = await userGarments.addGarment(stored);
+          setSelectedGarment(garment);
+        }}
+      />
 
       {runError && <p className="error">{runError}</p>}
       {live.error && <p className="error">live inference error: {live.error}</p>}

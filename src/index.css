@@ -77,6 +77,15 @@ button:disabled {
   border: 1px solid #374151;
 }
 
+.anchor-editor {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #374151;
+  cursor: crosshair;
+  touch-action: none;
+}
+
 .garment-picker {
   display: flex;
   flex-wrap: wrap;
