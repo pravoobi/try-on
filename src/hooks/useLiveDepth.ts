@@ -4,7 +4,7 @@ import type { UseAdvancedMode } from './useAdvancedMode';
 
 export interface UseLiveDepth {
   /** Latest person-depth estimate, reused between throttled ticks. Null until the first tick resolves. */
-  depth: ImageBitmap | null;
+  depth: OffscreenCanvas | null;
 }
 
 /**
@@ -17,14 +17,21 @@ export interface UseLiveDepth {
  * changes slowly relative to pose, so a slightly stale depth map is a fine
  * trade for never blocking the pose loop.
  *
+ * The result is exposed as an OffscreenCanvas, NOT the worker's ImageBitmap:
+ * an ImageBitmap held in React state can be close()d by its producer while
+ * a paint that captured the previous state is still in flight, and drawing
+ * a detached bitmap throws InvalidStateError out of the render effect —
+ * which unmounts the whole app (observed as a hard crash in live mode). A
+ * canvas we own and never close can't be pulled out from under a paint;
+ * superseded canvases are simply garbage-collected.
+ *
  * WebGPU only: on the wasm fallback, depth inference is ~30s/frame (A1
  * notes), so this hook simply never issues a request there — live mode
  * silently keeps today's arm-capsule occlusion / unshaded rendering instead
  * (matches §5.5's "CPU/Wasm fallback: depth at photo-mode only").
  */
 export function useLiveDepth(advanced: UseAdvancedMode, frame: ImageBitmap | null, active: boolean): UseLiveDepth {
-  const [depth, setDepth] = useState<ImageBitmap | null>(null);
-  const depthRef = useRef<ImageBitmap | null>(null);
+  const [depth, setDepth] = useState<OffscreenCanvas | null>(null);
   const frameRef = useRef<ImageBitmap | null>(null);
   const busyRef = useRef(false);
 
@@ -34,8 +41,6 @@ export function useLiveDepth(advanced: UseAdvancedMode, frame: ImageBitmap | nul
 
   useEffect(() => {
     if (!enabled) {
-      depthRef.current?.close();
-      depthRef.current = null;
       setDepth(null);
       return;
     }
@@ -46,7 +51,8 @@ export function useLiveDepth(advanced: UseAdvancedMode, frame: ImageBitmap | nul
     const tick = async () => {
       if (cancelled || busyRef.current) return;
       const current = frameRef.current;
-      if (!current) return;
+      // width 0 = the live loop already closed this frame; skip the tick.
+      if (!current || current.width === 0) return;
       busyRef.current = true;
       try {
         const maxDim = config.liveDepth.maxDim;
@@ -59,13 +65,12 @@ export function useLiveDepth(advanced: UseAdvancedMode, frame: ImageBitmap | nul
         smallCtx.drawImage(current, 0, 0, dw, dh);
         const bitmap = await createImageBitmap(small);
         const result = await advanced.estimateDepth(bitmap);
-        if (cancelled) {
-          result.close();
-          return;
-        }
-        depthRef.current?.close();
-        depthRef.current = result;
-        setDepth(result);
+        const copy = new OffscreenCanvas(result.width, result.height);
+        const copyCtx = copy.getContext('2d');
+        copyCtx?.drawImage(result, 0, 0);
+        result.close();
+        if (cancelled || !copyCtx) return;
+        setDepth(copy);
       } catch {
         // Best-effort; occlusion/shading just fall back to the previous (or no) depth this tick.
       } finally {

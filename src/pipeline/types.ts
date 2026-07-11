@@ -89,6 +89,14 @@ export type SkirtAnchors = Record<SkirtAnchorName, Point>;
 /** How far below the hips a garment's hem falls (see CLAUDE.md garment data model). */
 export type HemLength = 'hip' | 'knee' | 'ankle';
 
+/**
+ * A drawImage-able depth map with known dimensions — an ImageBitmap
+ * (photo-mode person depth) or an OffscreenCanvas (live mode holds depth in
+ * a canvas it owns, because an ImageBitmap can be close()d by its producer
+ * while a React paint still references it — see hooks/useLiveDepth.ts).
+ */
+export type DepthMapSource = CanvasImageSource & { width: number; height: number };
+
 export interface PipelineTimings {
   segmentMs: number;
   poseMs: number;

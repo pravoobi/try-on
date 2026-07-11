@@ -243,23 +243,44 @@ build time — the browser-ML ecosystem moves fast.
   done-when, but skipping it would have made the back view visibly flatter
   than the front whenever shading is on — a jarring inconsistency for a
   feature literally about making orientation changes look natural.
-- **Verification gap, stated plainly:** the sandboxed browser environment
-  used to check this phase has no camera device, so the actual "turn
-  around slowly and watch the garment foreshorten/fade/show its back" user
-  experience could not be visually confirmed end-to-end. What WAS verified:
-  all 24 new unit tests (`orientation.test.ts`, `anchorMapping.test.ts`)
-  covering calibration growth/decay, the front/profile/back view-selection
-  table (including the crossfade-ramp bug caught above), and the
-  foreshorten-factor shape; a live Chrome check that photo mode is
-  pixel-for-pixel unaffected (advanced mode + shading + a user-uploaded
-  garment all render exactly as before) with zero console errors; and that
-  toggling into/out of live mode (with the resulting camera-permission
-  request left permanently unresolved, since no camera exists to grant)
-  neither crashes nor logs errors. Whoever next has access to a real webcam
-  should walk through the phase's actual done-when checklist (foreshorten
-  to ±40°, full turn shows the back view for a back-capable asset,
-  fade+hint for front-only, no smeared garment in the profile band) before
-  fully trusting this phase in production.
+- **Post-A5 crash fix (closed-ImageBitmap race) — the phase as first
+  committed crashed live mode within seconds; keep this invariant in
+  mind for any future bitmap-producing hook.** A5 added asynchronous
+  state producers to live mode (throttled depth every ~200ms, orientation
+  per frame) on top of the existing frame loop, and every one of those
+  producers followed the same pattern: close the previous ImageBitmap,
+  then setState the replacement. A React paint that committed between the
+  close() and the replacement landing holds a *detached* bitmap — and
+  `drawImage` on one throws `InvalidStateError` out of DebugCanvas's
+  render effect, which unmounts the entire app. Reproduced deterministically
+  in Chrome with a fake `getUserMedia` (canvas.captureStream of an animated
+  test photo). Three-part fix: (1) DebugCanvas now guards every incoming
+  bitmap — a detached ImageBitmap reports `width === 0` — skipping the
+  paint for a stale frame/mask and degrading stale garment/depth inputs to
+  null; (2) `useLiveDepth` hands out an OffscreenCanvas *copy* it never
+  closes (superseded canvases just get GC'd) instead of the worker's
+  ImageBitmap, closing the bitmap immediately — hence the `DepthMapSource`
+  type in pipeline/types.ts and the widened `personDepth` signatures;
+  (3) `useTorsoOrientation` derives during render (useMemo keyed on the
+  keypoints array identity + calibration in a ref) instead of
+  state-plus-effect, halving live-mode commits and shrinking the race
+  window. Verified post-fix: several minutes of live rendering under the
+  fake webcam with zero errors, where pre-fix it died in under ten seconds.
+- **Live verification via fake webcam (partially closes the earlier
+  camera gap):** overriding `getUserMedia` with a canvas `captureStream`
+  drawing a test photo whose width oscillates (simulating a torso turning)
+  exercised the real live pipeline end-to-end in Chrome: yaw tracked the
+  squeeze up to ~44°, crossed into the profile zone, the garment faded and
+  the "turn back toward the camera" hint appeared, then recovered to a
+  full-opacity front view — orientation → view-selection → fade → hint all
+  confirmed live. Two caveats keep the real-webcam walkthrough on the
+  checklist: the back-view swap needs face keypoints to *drop out* (a real
+  person turning away), which a squeezed frontal photo can't simulate; and
+  the harness itself taught a lesson — under heavy main-thread load,
+  `setInterval` animation clocks starve badly, so drive simulated motion
+  from `performance.now()`, not tick counts. Whoever next has a real webcam
+  should still walk the phase's done-when checklist (full turn shows the
+  back view for a back-capable asset; no smeared garment mid-turn).
 
 ## 1. Problem statement (from the product owner)
 

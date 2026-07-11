@@ -9,6 +9,7 @@
  */
 import { config } from '../config';
 import { renderFeatheredMask } from './maskRender';
+import type { DepthMapSource } from './types';
 
 export interface LightEstimate {
   /** Unit vector in (image-x, image-y, camera-z) space. */
@@ -111,7 +112,7 @@ export function applyGarmentShading(
   bbox: ShadingBBox,
   w: number,
   h: number,
-  personDepth?: ImageBitmap | null,
+  personDepth?: DepthMapSource | null,
 ): OffscreenCanvas {
   const { bx, by, bw, bh } = bbox;
   const shaded = new OffscreenCanvas(w, h);

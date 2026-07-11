@@ -3,6 +3,7 @@ import { config } from '../config';
 import { renderFeatheredMask, tintMask } from '../pipeline/maskRender';
 import { renderLehengaCholiTryOn, renderTryOn, type TryOnStatus } from '../pipeline/compositor';
 import type {
+  DepthMapSource,
   GarmentAnchors,
   HemLength,
   KeypointName,
@@ -10,6 +11,11 @@ import type {
   SkirtAnchors,
 } from '../pipeline/types';
 import { SKELETON_EDGES } from '../pipeline/types';
+
+/** A close()d ImageBitmap is "detached" and reports width 0 — drawing it throws. */
+function isDetached(source: { width: number } | null | undefined): boolean {
+  return !!source && source.width === 0;
+}
 
 export type GarmentOverlay =
   | {
@@ -48,8 +54,9 @@ interface Props {
   /** Advanced-mode person depth map (Phase A2) — fed to the compositor for
    * per-pixel depth-tested occlusion instead of the arm-capsule heuristic.
    * Independent of depthBitmap: this stays active even when the depth
-   * debug view above isn't toggled on. */
-  personDepthBitmap?: ImageBitmap | null;
+   * debug view above isn't toggled on. An ImageBitmap in photo mode, an
+   * OffscreenCanvas in live mode (see hooks/useLiveDepth.ts). */
+  personDepthBitmap?: DepthMapSource | null;
   onTryOnStatus?: (status: TryOnStatus | null) => void;
 }
 
@@ -65,10 +72,33 @@ export function DebugCanvas({
   onTryOnStatus,
 }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
+  const lastStatusRef = useRef<TryOnStatus | null>(null);
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
+
+    // Live mode interleaves several asynchronous producers (frames from the
+    // inference loop, throttled depth, garment swaps) whose cleanup closes
+    // the previous ImageBitmap before React commits the replacement state —
+    // so a paint can momentarily hold a detached bitmap, and drawing one
+    // throws InvalidStateError out of this effect, unmounting the whole
+    // app. Skip that paint instead (keeping the previous canvas contents);
+    // the producer's own setState lands immediately after with the live
+    // replacement. Detached garment/depth inputs degrade to "without that
+    // input" rather than skipping the frame entirely.
+    if (isDetached(image) || (result && isDetached(result.maskBitmap))) return;
+    const safeDepth = depthBitmap && !isDetached(depthBitmap) ? depthBitmap : null;
+    const safePersonDepth = personDepthBitmap && !isDetached(personDepthBitmap) ? personDepthBitmap : null;
+    let safeGarment = garment ?? null;
+    if (safeGarment) {
+      const garmentDetached =
+        safeGarment.kind === 'single'
+          ? isDetached(safeGarment.image)
+          : isDetached(safeGarment.choliImage) || isDetached(safeGarment.lehengaImage);
+      if (garmentDetached) safeGarment = null;
+    }
+
     const w = image.width;
     const h = image.height;
     canvas.width = w;
@@ -77,50 +107,58 @@ export function DebugCanvas({
     if (!ctx) return;
 
     let tryOnStatus: TryOnStatus | null = null;
-    if (depthBitmap) {
+    if (safeDepth) {
       // Depth is a standalone inspection view, not a tint over the try-on
       // render — drawing the garment underneath would just make the depth
       // map harder to read, not easier.
       ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(depthBitmap, 0, 0, w, h);
-    } else if (garment && result) {
-      if (garment.kind === 'single') {
+      ctx.drawImage(safeDepth, 0, 0, w, h);
+    } else if (safeGarment && result) {
+      if (safeGarment.kind === 'single') {
         tryOnStatus = renderTryOn(ctx, {
           frame: image,
           maskBitmap: result.maskBitmap,
           keypoints: result.keypoints,
-          garmentImage: garment.image,
-          garmentAnchors: garment.anchors,
-          hemLength: garment.hemLength,
-          personDepth: personDepthBitmap,
-          garmentNormal: garment.normal,
-          foreshortenFactor: garment.foreshortenFactor,
-          viewAlpha: garment.viewAlpha,
+          garmentImage: safeGarment.image,
+          garmentAnchors: safeGarment.anchors,
+          hemLength: safeGarment.hemLength,
+          personDepth: safePersonDepth,
+          garmentNormal: safeGarment.normal,
+          foreshortenFactor: safeGarment.foreshortenFactor,
+          viewAlpha: safeGarment.viewAlpha,
         });
       } else {
         tryOnStatus = renderLehengaCholiTryOn(ctx, {
           frame: image,
           maskBitmap: result.maskBitmap,
           keypoints: result.keypoints,
-          choliImage: garment.choliImage,
-          choliAnchors: garment.choliAnchors,
-          lehengaImage: garment.lehengaImage,
-          lehengaAnchors: garment.lehengaAnchors,
-          skirtLength: garment.skirtLength,
-          personDepth: personDepthBitmap,
-          choliNormal: garment.choliNormal,
-          lehengaNormal: garment.lehengaNormal,
-          foreshortenFactor: garment.foreshortenFactor,
-          viewAlpha: garment.viewAlpha,
+          choliImage: safeGarment.choliImage,
+          choliAnchors: safeGarment.choliAnchors,
+          lehengaImage: safeGarment.lehengaImage,
+          lehengaAnchors: safeGarment.lehengaAnchors,
+          skirtLength: safeGarment.skirtLength,
+          personDepth: safePersonDepth,
+          choliNormal: safeGarment.choliNormal,
+          lehengaNormal: safeGarment.lehengaNormal,
+          foreshortenFactor: safeGarment.foreshortenFactor,
+          viewAlpha: safeGarment.viewAlpha,
         });
       }
     } else {
       ctx.clearRect(0, 0, w, h);
       ctx.drawImage(image, 0, 0);
     }
-    onTryOnStatus?.(tryOnStatus);
+    // Report only on change: this effect re-runs on every live frame, and
+    // an unconditional parent setState from here is the app's highest-
+    // frequency effect→setState edge — harmless when React bails on
+    // identical values, but it needlessly counts toward the nested-update
+    // ceiling during load spikes (mode switches mid-inference).
+    if (tryOnStatus !== lastStatusRef.current) {
+      lastStatusRef.current = tryOnStatus;
+      onTryOnStatus?.(tryOnStatus);
+    }
 
-    if (result && showMask && !depthBitmap) {
+    if (result && showMask && !safeDepth) {
       const tinted = tintMask(renderFeatheredMask(result.maskBitmap, w, h), '#2dd4bf');
       ctx.globalAlpha = config.maskOpacity;
       ctx.drawImage(tinted, 0, 0);

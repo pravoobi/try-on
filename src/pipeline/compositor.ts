@@ -21,6 +21,7 @@ import { applyGarmentShading, estimateLight, type ShadingBBox } from './relight'
 import {
   ANCHOR_NAMES,
   SKIRT_ANCHOR_NAMES,
+  type DepthMapSource,
   type GarmentAnchors,
   type HemLength,
   type Keypoint,
@@ -43,9 +44,10 @@ export interface TryOnInput {
   /** Fraction of shoulder-to-shoulder width used as the occlusion capsule radius (fallback path only). */
   armOcclusionRadiusFactor?: number;
   /** Advanced-mode person depth map (Phase A2) — when present, occlusion is
-   * depth-tested per-pixel instead of the arm-capsule heuristic. Same pixel
-   * dimensions as `frame`. */
-  personDepth?: ImageBitmap | null;
+   * depth-tested per-pixel instead of the arm-capsule heuristic. Any
+   * resolution (scaled up to the frame internally — live mode passes a
+   * downscaled one, see hooks/useLiveDepth.ts). */
+  personDepth?: DepthMapSource | null;
   /** Advanced-mode garment normal map (Phase A3), same pixel space/coverage
    * as `garmentImage` — when present, the garment is Lambertian-shaded
    * against a light estimated from `frame` before compositing. */
@@ -145,7 +147,7 @@ export interface LehengaCholiTryOnInput {
   warpGrid?: WarpGridOptions;
   armOcclusion?: boolean;
   armOcclusionRadiusFactor?: number;
-  personDepth?: ImageBitmap | null;
+  personDepth?: DepthMapSource | null;
   /** Advanced-mode normal maps (Phase A3) for each piece, same pixel space/coverage as their respective images. */
   choliNormal?: (CanvasImageSource & { width: number; height: number }) | null;
   lehengaNormal?: (CanvasImageSource & { width: number; height: number }) | null;
@@ -354,7 +356,7 @@ function boxBlurRedChannel(data: Uint8ClampedArray, w: number, h: number, radius
 function applyDepthOcclusion(
   ctx: Canvas2DContext,
   frame: ImageBitmap,
-  personDepth: ImageBitmap,
+  personDepth: DepthMapSource,
   keypoints: readonly Keypoint[],
   bodyAnchors: GarmentAnchors,
   w: number,
