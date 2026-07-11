@@ -12,7 +12,14 @@ import type {
 import { SKELETON_EDGES } from '../pipeline/types';
 
 export type GarmentOverlay =
-  | { kind: 'single'; image: ImageBitmap; anchors: GarmentAnchors; hemLength: HemLength }
+  | {
+      kind: 'single';
+      image: ImageBitmap;
+      anchors: GarmentAnchors;
+      hemLength: HemLength;
+      /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
+      normal?: OffscreenCanvas | null;
+    }
   | {
       kind: 'lehenga-choli';
       choliImage: ImageBitmap;
@@ -20,6 +27,8 @@ export type GarmentOverlay =
       lehengaImage: ImageBitmap;
       lehengaAnchors: SkirtAnchors;
       skirtLength: HemLength;
+      choliNormal?: OffscreenCanvas | null;
+      lehengaNormal?: OffscreenCanvas | null;
     };
 
 interface Props {
@@ -79,6 +88,7 @@ export function DebugCanvas({
           garmentAnchors: garment.anchors,
           hemLength: garment.hemLength,
           personDepth: personDepthBitmap,
+          garmentNormal: garment.normal,
         });
       } else {
         tryOnStatus = renderLehengaCholiTryOn(ctx, {
@@ -91,6 +101,8 @@ export function DebugCanvas({
           lehengaAnchors: garment.lehengaAnchors,
           skirtLength: garment.skirtLength,
           personDepth: personDepthBitmap,
+          choliNormal: garment.choliNormal,
+          lehengaNormal: garment.lehengaNormal,
         });
       }
     } else {

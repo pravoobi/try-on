@@ -12,7 +12,15 @@ import { useLiveTryOn } from './hooks/useLiveTryOn';
 import { usePipeline } from './hooks/usePipeline';
 import { useWebcam } from './hooks/useWebcam';
 import type { TryOnStatus } from './pipeline/compositor';
+import { depthToNormalMap } from './pipeline/normalMap';
 import type { Accelerator, PipelineResult } from './pipeline/types';
+
+/** The advanced-mode normal map(s) for the currently-selected garment
+ * (Phase A3) — mirrors LoadedGarmentImages' single/lehenga-choli shape,
+ * since a lehenga-choli's two pieces each need their own normal map. */
+type GarmentNormals =
+  | { kind: 'single'; normal: OffscreenCanvas }
+  | { kind: 'lehenga-choli'; choliNormal: OffscreenCanvas; lehengaNormal: OffscreenCanvas };
 
 /** The loaded ImageBitmap(s) for the currently-selected garment — one for a
  * single-piece garment, two for a lehenga-choli (choli + lehenga skirt). */
@@ -63,8 +71,10 @@ export default function App() {
   // "Enhance (3D)" button below.
   const advanced = useAdvancedMode();
   const [showDepth, setShowDepth] = useState(false);
+  const [showShading, setShowShading] = useState(true);
   const [photoDepth, setPhotoDepth] = useState<ImageBitmap | null>(null);
   const [garmentDepth, setGarmentDepth] = useState<ImageBitmap | null>(null);
+  const [garmentNormals, setGarmentNormals] = useState<GarmentNormals | null>(null);
   const photoDepthRef = useRef<ImageBitmap | null>(null);
   const garmentDepthRef = useRef<ImageBitmap | null>(null);
 
@@ -203,31 +213,69 @@ export default function App() {
   }, [showDepth, mode, advanced.status, image, selectedGarment]);
 
   // Garment depth preview (Phase A1 "done when": depth maps render for
-  // garment images too). Uses the garment's front/primary image — the
-  // choli for a lehenga-choli, the single image otherwise.
+  // garment images too) + normal maps for relighting (Phase A3). A
+  // lehenga-choli's two pieces are separate photos and each needs its own
+  // normal map; the thumbnail preview still shows just the primary
+  // (choli) depth. Normal-map generation is pure synchronous math on the
+  // depth we already computed (pipeline/normalMap.ts) — no extra model
+  // inference beyond the depth estimation itself.
   useEffect(() => {
-    const primaryImage =
-      garmentImages?.kind === 'lehenga-choli' ? garmentImages.choliImage : (garmentImages?.image ?? null);
-    if (advanced.status !== 'ready' || !primaryImage) {
+    if (advanced.status !== 'ready' || !garmentImages) {
       garmentDepthRef.current?.close();
       garmentDepthRef.current = null;
       setGarmentDepth(null);
+      setGarmentNormals(null);
       return;
     }
     let cancelled = false;
     void (async () => {
       try {
-        const copy = await createImageBitmap(primaryImage);
-        const depth = await advanced.estimateDepth(copy);
-        if (cancelled) {
-          depth.close();
-          return;
+        if (garmentImages.kind === 'lehenga-choli') {
+          const choliCopy = await createImageBitmap(garmentImages.choliImage);
+          const choliDepth = await advanced.estimateDepth(choliCopy);
+          if (cancelled) {
+            choliDepth.close();
+            return;
+          }
+          const choliNormal = depthToNormalMap(
+            choliDepth,
+            garmentImages.choliImage,
+            config.relighting.normalStrength,
+          );
+
+          const lehengaCopy = await createImageBitmap(garmentImages.lehengaImage);
+          const lehengaDepth = await advanced.estimateDepth(lehengaCopy);
+          if (cancelled) {
+            choliDepth.close();
+            lehengaDepth.close();
+            return;
+          }
+          const lehengaNormal = depthToNormalMap(
+            lehengaDepth,
+            garmentImages.lehengaImage,
+            config.relighting.normalStrength,
+          );
+          lehengaDepth.close(); // only needed to derive its normal map above.
+
+          garmentDepthRef.current?.close();
+          garmentDepthRef.current = choliDepth;
+          setGarmentDepth(choliDepth);
+          setGarmentNormals({ kind: 'lehenga-choli', choliNormal, lehengaNormal });
+        } else {
+          const copy = await createImageBitmap(garmentImages.image);
+          const depth = await advanced.estimateDepth(copy);
+          if (cancelled) {
+            depth.close();
+            return;
+          }
+          const normal = depthToNormalMap(depth, garmentImages.image, config.relighting.normalStrength);
+          garmentDepthRef.current?.close();
+          garmentDepthRef.current = depth;
+          setGarmentDepth(depth);
+          setGarmentNormals({ kind: 'single', normal });
         }
-        garmentDepthRef.current?.close();
-        garmentDepthRef.current = depth;
-        setGarmentDepth(depth);
       } catch {
-        // Best-effort preview; ignore failures.
+        // Best-effort preview/shading; ignore failures — flat rendering still works.
       }
     })();
     return () => {
@@ -254,6 +302,11 @@ export default function App() {
 
   const garmentOverlay = useMemo((): GarmentOverlay | null => {
     if (!selectedGarment || !garmentImages) return null;
+    // Shading is an advanced-mode enhancement (Phase A3): the "shading"
+    // checkbox is the A/B toggle demonstrating flat-vs-shaded, so simply
+    // omit the normal map(s) when it's off rather than threading a
+    // separate flag through the compositor.
+    const normals = showShading ? garmentNormals : null;
     if (selectedGarment.category === 'lehenga-choli' && garmentImages.kind === 'lehenga-choli') {
       return {
         kind: 'lehenga-choli',
@@ -262,6 +315,8 @@ export default function App() {
         lehengaImage: garmentImages.lehengaImage,
         lehengaAnchors: selectedGarment.lehenga.anchors,
         skirtLength: selectedGarment.meta.length,
+        choliNormal: normals?.kind === 'lehenga-choli' ? normals.choliNormal : null,
+        lehengaNormal: normals?.kind === 'lehenga-choli' ? normals.lehengaNormal : null,
       };
     }
     if (selectedGarment.category !== 'lehenga-choli' && garmentImages.kind === 'single') {
@@ -270,13 +325,14 @@ export default function App() {
         image: garmentImages.image,
         anchors: selectedGarment.anchors,
         hemLength: selectedGarment.meta.length,
+        normal: normals?.kind === 'single' ? normals.normal : null,
       };
     }
     // Transient mismatch: selectedGarment just changed shape and the async
     // image load for it hasn't landed yet — skip a render rather than pass
     // mismatched data.
     return null;
-  }, [selectedGarment, garmentImages]);
+  }, [selectedGarment, garmentImages, garmentNormals, showShading]);
 
   const displayImage = mode === 'live' ? (live.latest?.frame ?? null) : image;
   const displayResult = mode === 'live' ? (live.latest?.result ?? null) : result;
@@ -357,6 +413,14 @@ export default function App() {
                 onChange={(e) => setShowDepth(e.target.checked)}
               />
               depth
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showShading}
+                onChange={(e) => setShowShading(e.target.checked)}
+              />
+              shading
             </label>
             <button onClick={() => advanced.setEnabled(false)}>turn off</button>
           </>

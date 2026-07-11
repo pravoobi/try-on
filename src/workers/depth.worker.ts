@@ -21,10 +21,22 @@ type DepthEstimator = (image: RawImage) => Promise<{ depth: RawImage }>;
 
 let estimator: DepthEstimator | null = null;
 
+// Requests are serialized through this queue: the transformers.js pipeline
+// wraps a single ONNX Runtime session, which isn't safe to invoke
+// concurrently. Without this, two nearly-simultaneous 'process' messages
+// (e.g. the person photo's depth and a garment's depth, both triggered by
+// the same garment selection) can run estimator() overlapped and
+// cross-contaminate their outputs — one request's result quietly leaking
+// pixels from the other's input image.
+let queue: Promise<void> = Promise.resolve();
+
 self.onmessage = (e: MessageEvent<DepthWorkerRequest>) => {
   const msg = e.data;
-  if (msg.type === 'init') void init(msg.device);
-  else if (msg.type === 'process') void process(msg.bitmap, msg.seq);
+  if (msg.type === 'init') {
+    queue = queue.then(() => init(msg.device));
+  } else if (msg.type === 'process') {
+    queue = queue.then(() => process(msg.bitmap, msg.seq));
+  }
 };
 
 async function init(device: DepthAccelerator): Promise<void> {

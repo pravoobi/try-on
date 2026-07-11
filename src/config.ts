@@ -68,9 +68,47 @@ export const config = {
   depthOcclusion: {
     /** Scan bbox margin, as a fraction of the anchor bbox size — hands/hair typically extend past the torso anchors themselves. */
     bboxMarginFrac: 0.5,
+    /**
+     * Box-blur radius (px) applied to the person depth map before the
+     * occlusion compare. Monocular depth estimation misjudges high-contrast
+     * printed/patterned fabric as height variation — a real occluding
+     * object (arm, hair, held item) is a broad, low-frequency depth shift,
+     * while print-induced noise is high-frequency; blurring suppresses the
+     * latter without erasing the former. Set to 0 to disable (raw per-pixel
+     * compare — will misfire on printed garments/clothing, see
+     * docs/plan-3d-garment-assets.md Phase A2 notes).
+     */
+    blurRadiusPx: 18,
     /** Gray-level tolerance before a person pixel counts as "in front of" the garment (0-255 scale). */
     marginGray: 10,
     /** Width, in gray levels, of the soft occlusion edge ramp. */
     softBandGray: 18,
+  },
+  /**
+   * Single-light Lambertian relighting (Phase A3, advanced mode only): see
+   * pipeline/relight.ts. Shades a flat garment photo against a light
+   * direction estimated from the person's own photo, using a normal map
+   * derived from the garment's own depth map (pipeline/normalMap.ts).
+   */
+  relighting: {
+    /** Shading-pass scan bbox margin, as a fraction of the anchor bbox — the garment's own rendered area doesn't reach as far past its anchors as arms/hair do (compare depthOcclusion.bboxMarginFrac). */
+    bboxMarginFrac: 0.15,
+    /** How much a 1px depth-map height delta tilts the derived normal — higher = more visible fabric texture from the garment's own depth map. */
+    normalStrength: 0.12,
+    /** Baseline light every garment pixel gets regardless of orientation, so shaded areas never go pure black. */
+    ambient: 0.55,
+    /** How strongly the person photo's average brightness gradient tilts the estimated light direction off frontal. */
+    gradientGain: 0.05,
+    /** Z-component bias for the estimated light before normalizing — portrait photos are usually front-lit; keeps shading plausible even when the gradient signal is weak/noisy. */
+    frontalBias: 1.2,
+    /** Overall shading multiplier range, driven by the photo's mean luminance. */
+    minIntensity: 0.7,
+    maxIntensity: 1.3,
+    /** Clamp on the final per-pixel shade factor, so no pixel goes fully black or blown out. */
+    minShade: 0.35,
+    maxShade: 1.15,
+    /** Screen-space AO from person-depth edges (body curving away from camera). */
+    aoGain: 0.6,
+    aoMax: 0.5,
   },
 } as const;
