@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Garment anchor annotator</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background: #111318;
+    color: #e5e7eb;
+    display: flex;
+    height: 100vh;
+  }
+  #canvasPane {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 1rem;
+  }
+  #canvasWrap { position: relative; }
+  canvas { background: #1f2430; border: 1px solid #374151; cursor: crosshair; }
+  #sidebar {
+    width: 340px;
+    flex-shrink: 0;
+    padding: 1rem;
+    border-left: 1px solid #374151;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  h1 { font-size: 1rem; margin: 0; }
+  h2 { font-size: 0.8rem; margin: 0 0 0.4rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; }
+  label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
+  input[type="text"], select, textarea {
+    background: #1f2430;
+    color: #e5e7eb;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 0.4rem 0.5rem;
+    font: inherit;
+  }
+  button {
+    background: #1f2430;
+    color: #e5e7eb;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    padding: 0.45rem 0.7rem;
+    font: inherit;
+    cursor: pointer;
+  }
+  button:hover { border-color: #6b7280; }
+  button.primary { background: #2563eb; border-color: #2563eb; color: white; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  #status { font-size: 0.85rem; padding: 0.5rem 0.6rem; border-radius: 6px; background: #1f2430; }
+  #status.ready { color: #34d399; }
+  #status.pending { color: #fbbf24; }
+  #anchorList { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; font-family: ui-monospace, monospace; }
+  .anchor-row { display: flex; justify-content: space-between; padding: 0.15rem 0.4rem; border-radius: 4px; }
+  .anchor-row.done { color: #34d399; }
+  .anchor-row.current { background: #2563eb33; color: #93c5fd; }
+  textarea { min-height: 220px; font-family: ui-monospace, monospace; font-size: 0.75rem; resize: vertical; }
+  .row { display: flex; gap: 0.5rem; }
+  .row > * { flex: 1; }
+  .hint { font-size: 0.75rem; color: #9ca3af; }
+</style>
+</head>
+<body>
+  <div id="canvasPane">
+    <div id="canvasWrap">
+      <canvas id="canvas" width="480" height="640"></canvas>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <h1>Garment anchor annotator</h1>
+    <p class="hint">Load a background-removed garment PNG, click the 6 anchors in
+      order, then export the JSON for catalog.json. Drag a placed marker to
+      adjust it; click "Redo from here" to re-place from a given anchor on.</p>
+
+    <label>
+      Garment PNG
+      <input type="file" id="fileInput" accept="image/png,image/*" />
+    </label>
+
+    <div id="status" class="pending">Load an image to begin.</div>
+
+    <div>
+      <h2>Anchors</h2>
+      <div id="anchorList"></div>
+      <div class="row" style="margin-top: 0.5rem;">
+        <button id="resetBtn">Reset anchors</button>
+        <button id="undoBtn">Undo last</button>
+      </div>
+    </div>
+
+    <div>
+      <h2>Metadata</h2>
+      <label>id
+        <input type="text" id="idInput" placeholder="kurti-blue-01" />
+      </label>
+      <label>category
+        <select id="categoryInput">
+          <option value="kurti">kurti</option>
+          <option value="dress">dress</option>
+          <option value="top">top</option>
+          <option value="lehenga">lehenga</option>
+          <option value="saree">saree</option>
+        </select>
+      </label>
+      <label>image path
+        <input type="text" id="imagePathInput" placeholder="/garments/kurti-blue-01.png" />
+      </label>
+      <div class="row">
+        <label>sleeves
+          <select id="sleevesInput">
+            <option value="sleeveless">sleeveless</option>
+            <option value="half">half</option>
+            <option value="full">full</option>
+          </select>
+        </label>
+        <label>length
+          <select id="lengthInput">
+            <option value="hip">hip</option>
+            <option value="knee">knee</option>
+            <option value="ankle">ankle</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div>
+      <h2>Export</h2>
+      <div class="row">
+        <button id="exportBtn" class="primary">Build JSON</button>
+        <button id="copyBtn">Copy</button>
+        <button id="downloadBtn">Download</button>
+      </div>
+      <textarea id="output" readonly placeholder="Build JSON once all 6 anchors are placed."></textarea>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  var ANCHOR_ORDER = ['shoulderL', 'shoulderR', 'waistL', 'waistR', 'hemL', 'hemR'];
+  var ANCHOR_LABELS = {
+    shoulderL: 'Left shoulder', shoulderR: 'Right shoulder',
+    waistL: 'Left waist', waistR: 'Right waist',
+    hemL: 'Left hem', hemR: 'Right hem',
+  };
+  // "Left"/"right" are anatomical (the wearer's left), which is screen-right
+  // in a front-facing garment photo — matches the MoveNet body convention.
+  var SKELETON_EDGES = [
+    ['shoulderL', 'shoulderR'], ['shoulderL', 'waistL'], ['waistL', 'hemL'],
+    ['shoulderR', 'waistR'], ['waistR', 'hemR'], ['waistL', 'waistR'], ['hemL', 'hemR'],
+  ];
+
+  var canvas = document.getElementById('canvas');
+  var ctx = canvas.getContext('2d');
+  var fileInput = document.getElementById('fileInput');
+  var statusEl = document.getElementById('status');
+  var anchorListEl = document.getElementById('anchorList');
+  var resetBtn = document.getElementById('resetBtn');
+  var undoBtn = document.getElementById('undoBtn');
+  var exportBtn = document.getElementById('exportBtn');
+  var copyBtn = document.getElementById('copyBtn');
+  var downloadBtn = document.getElementById('downloadBtn');
+  var output = document.getElementById('output');
+  var idInput = document.getElementById('idInput');
+  var categoryInput = document.getElementById('categoryInput');
+  var imagePathInput = document.getElementById('imagePathInput');
+  var sleevesInput = document.getElementById('sleevesInput');
+  var lengthInput = document.getElementById('lengthInput');
+
+  var img = null;
+  var scale = 1; // canvas display px per image px
+  /** @type {Record<string, [number, number]>} anchors in image-pixel space */
+  var anchors = {};
+  var placedOrder = []; // anchor names in placement order, for undo
+  var dragging = null; // anchor name currently being dragged
+
+  function nextAnchor() {
+    for (var i = 0; i < ANCHOR_ORDER.length; i++) {
+      if (!(ANCHOR_ORDER[i] in anchors)) return ANCHOR_ORDER[i];
+    }
+    return null;
+  }
+
+  function updateStatus() {
+    var next = nextAnchor();
+    if (!img) {
+      statusEl.textContent = 'Load an image to begin.';
+      statusEl.className = 'pending';
+    } else if (next) {
+      statusEl.textContent = 'Click: ' + ANCHOR_LABELS[next] + ' (' + next + ')';
+      statusEl.className = 'pending';
+    } else {
+      statusEl.textContent = 'All anchors placed. Drag to fine-tune, or build the JSON.';
+      statusEl.className = 'ready';
+    }
+    renderAnchorList(next);
+  }
+
+  function renderAnchorList(next) {
+    anchorListEl.innerHTML = '';
+    for (var i = 0; i < ANCHOR_ORDER.length; i++) {
+      var name = ANCHOR_ORDER[i];
+      var row = document.createElement('div');
+      var done = name in anchors;
+      row.className = 'anchor-row' + (done ? ' done' : '') + (name === next ? ' current' : '');
+      var coord = done ? '(' + anchors[name][0].toFixed(0) + ', ' + anchors[name][1].toFixed(0) + ')' : '—';
+      row.innerHTML = '<span>' + name + '</span><span>' + coord + '</span>';
+      anchorListEl.appendChild(row);
+    }
+  }
+
+  function draw() {
+    if (!img) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = '#f472b666';
+    ctx.lineWidth = 1.5;
+    SKELETON_EDGES.forEach(function (edge) {
+      var a = anchors[edge[0]], b = anchors[edge[1]];
+      if (!a || !b) return;
+      ctx.beginPath();
+      ctx.moveTo(a[0] * scale, a[1] * scale);
+      ctx.lineTo(b[0] * scale, b[1] * scale);
+      ctx.stroke();
+    });
+
+    ANCHOR_ORDER.forEach(function (name) {
+      var p = anchors[name];
+      if (!p) return;
+      var x = p[0] * scale, y = p[1] * scale;
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = '#facc15';
+      ctx.fill();
+      ctx.strokeStyle = '#111318';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.font = '11px system-ui, sans-serif';
+      ctx.fillStyle = '#e5e7eb';
+      ctx.fillText(name, x + 9, y - 9);
+    });
+  }
+
+  function loadImage(file) {
+    var url = URL.createObjectURL(file);
+    var image = new Image();
+    image.onload = function () {
+      img = image;
+      anchors = {};
+      placedOrder = [];
+      var maxW = 480, maxH = 720;
+      scale = Math.min(maxW / image.width, maxH / image.height, 1);
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+      var base = file.name.replace(/\.[^.]+$/, '');
+      if (!idInput.value) idInput.value = base;
+      if (!imagePathInput.value) imagePathInput.value = '/garments/' + file.name;
+      draw();
+      updateStatus();
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  }
+
+  function hitTest(cx, cy) {
+    var best = null, bestDist = 12; // px radius in canvas space
+    ANCHOR_ORDER.forEach(function (name) {
+      var p = anchors[name];
+      if (!p) return;
+      var dx = p[0] * scale - cx, dy = p[1] * scale - cy;
+      var d = Math.hypot(dx, dy);
+      if (d < bestDist) { bestDist = d; best = name; }
+    });
+    return best;
+  }
+
+  function canvasPointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return [e.clientX - rect.left, e.clientY - rect.top];
+  }
+
+  canvas.addEventListener('mousedown', function (e) {
+    if (!img) return;
+    var pt = canvasPointFromEvent(e);
+    var hit = hitTest(pt[0], pt[1]);
+    if (hit) { dragging = hit; return; }
+
+    var name = nextAnchor();
+    if (!name) return; // all placed; use drag to adjust
+    anchors[name] = [pt[0] / scale, pt[1] / scale];
+    placedOrder.push(name);
+    draw();
+    updateStatus();
+  });
+
+  window.addEventListener('mousemove', function (e) {
+    if (!dragging || !img) return;
+    var rect = canvas.getBoundingClientRect();
+    var x = clamp(e.clientX - rect.left, 0, canvas.width);
+    var y = clamp(e.clientY - rect.top, 0, canvas.height);
+    anchors[dragging] = [x / scale, y / scale];
+    draw();
+    renderAnchorList(nextAnchor());
+  });
+  window.addEventListener('mouseup', function () { dragging = null; });
+
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+  resetBtn.addEventListener('click', function () {
+    anchors = {};
+    placedOrder = [];
+    draw();
+    updateStatus();
+  });
+
+  undoBtn.addEventListener('click', function () {
+    var last = placedOrder.pop();
+    if (last) delete anchors[last];
+    draw();
+    updateStatus();
+  });
+
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (file) loadImage(file);
+  });
+
+  function buildGarmentJson() {
+    if (nextAnchor()) {
+      throw new Error('place all 6 anchors first');
+    }
+    if (!idInput.value.trim()) throw new Error('id is required');
+    if (!imagePathInput.value.trim()) throw new Error('image path is required');
+    var out = {
+      id: idInput.value.trim(),
+      category: categoryInput.value,
+      image: imagePathInput.value.trim(),
+      anchors: {},
+      meta: { sleeves: sleevesInput.value, length: lengthInput.value },
+    };
+    ANCHOR_ORDER.forEach(function (name) {
+      var p = anchors[name];
+      out.anchors[name] = [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10];
+    });
+    return out;
+  }
+
+  exportBtn.addEventListener('click', function () {
+    try {
+      var json = buildGarmentJson();
+      output.value = JSON.stringify(json, null, 2);
+    } catch (err) {
+      output.value = '';
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'pending';
+    }
+  });
+
+  copyBtn.addEventListener('click', function () {
+    if (!output.value) return;
+    navigator.clipboard.writeText(output.value);
+  });
+
+  downloadBtn.addEventListener('click', function () {
+    if (!output.value) return;
+    var blob = new Blob([output.value], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = (idInput.value.trim() || 'garment') + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  updateStatus();
+})();
+</script>
+</body>
+</html>

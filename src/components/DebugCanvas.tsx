@@ -1,16 +1,26 @@
 import { useEffect, useRef } from 'react';
 import { config } from '../config';
-import { SKELETON_EDGES, type KeypointName, type PipelineResult } from '../pipeline/types';
+import { renderFeatheredMask, tintMask } from '../pipeline/maskRender';
+import { renderTryOn, type TryOnStatus } from '../pipeline/compositor';
+import { SKELETON_EDGES, type GarmentAnchors, type HemLength, type KeypointName, type PipelineResult } from '../pipeline/types';
+
+export interface GarmentOverlay {
+  image: ImageBitmap;
+  anchors: GarmentAnchors;
+  hemLength: HemLength;
+}
 
 interface Props {
   image: ImageBitmap;
   result: PipelineResult | null;
   showMask: boolean;
   showSkeleton: boolean;
+  garment?: GarmentOverlay | null;
+  onTryOnStatus?: (status: TryOnStatus | null) => void;
 }
 
-/** Draws the photo with the segmentation mask tint and keypoint skeleton. */
-export function DebugCanvas({ image, result, showMask, showSkeleton }: Props) {
+/** Draws the photo, an optional try-on garment layer, and debug overlays (mask tint, skeleton). */
+export function DebugCanvas({ image, result, showMask, showSkeleton, garment, onTryOnStatus }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -23,29 +33,27 @@ export function DebugCanvas({ image, result, showMask, showSkeleton }: Props) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.drawImage(image, 0, 0);
+    let tryOnStatus: TryOnStatus | null = null;
+    if (garment && result) {
+      tryOnStatus = renderTryOn(ctx, {
+        frame: image,
+        maskBitmap: result.maskBitmap,
+        keypoints: result.keypoints,
+        garmentImage: garment.image,
+        garmentAnchors: garment.anchors,
+        hemLength: garment.hemLength,
+      });
+    } else {
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(image, 0, 0);
+    }
+    onTryOnStatus?.(tryOnStatus);
 
     if (result && showMask) {
-      // Tint the low-res mask: bilinear upscale + slight blur to feather
-      // edges (per CLAUDE.md: avoids hard halo artifacts), colored via
-      // source-in, alpha carries confidence.
-      const tint = document.createElement('canvas');
-      tint.width = w;
-      tint.height = h;
-      const tctx = tint.getContext('2d');
-      if (tctx) {
-        tctx.imageSmoothingEnabled = true;
-        tctx.imageSmoothingQuality = 'high';
-        tctx.filter = `blur(${Math.max(1, Math.round(w / 400))}px)`;
-        tctx.drawImage(result.maskBitmap, 0, 0, w, h);
-        tctx.filter = 'none';
-        tctx.globalCompositeOperation = 'source-in';
-        tctx.fillStyle = '#2dd4bf';
-        tctx.fillRect(0, 0, w, h);
-        ctx.globalAlpha = config.maskOpacity;
-        ctx.drawImage(tint, 0, 0);
-        ctx.globalAlpha = 1;
-      }
+      const tinted = tintMask(renderFeatheredMask(result.maskBitmap, w, h), '#2dd4bf');
+      ctx.globalAlpha = config.maskOpacity;
+      ctx.drawImage(tinted, 0, 0);
+      ctx.globalAlpha = 1;
     }
 
     if (result && showSkeleton) {
@@ -82,7 +90,7 @@ export function DebugCanvas({ image, result, showMask, showSkeleton }: Props) {
         }
       }
     }
-  }, [image, result, showMask, showSkeleton]);
+  }, [image, result, showMask, showSkeleton, garment, onTryOnStatus]);
 
   return <canvas ref={ref} className="debug-canvas" />;
 }

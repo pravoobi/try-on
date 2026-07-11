@@ -1,0 +1,142 @@
+[
+  {
+    "id": "kurti-teal-01",
+    "category": "kurti",
+    "image": "/garments/kurti-teal-01.png",
+    "anchors": {
+      "shoulderL": [
+        135,
+        60
+      ],
+      "shoulderR": [
+        325,
+        60
+      ],
+      "waistL": [
+        150,
+        310
+      ],
+      "waistR": [
+        310,
+        310
+      ],
+      "hemL": [
+        120,
+        560
+      ],
+      "hemR": [
+        340,
+        560
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "hip"
+    }
+  },
+  {
+    "id": "kurti-mustard-02",
+    "category": "kurti",
+    "image": "/garments/kurti-mustard-02.png",
+    "anchors": {
+      "shoulderL": [
+        140,
+        55
+      ],
+      "shoulderR": [
+        320,
+        55
+      ],
+      "waistL": [
+        142,
+        320
+      ],
+      "waistR": [
+        318,
+        320
+      ],
+      "hemL": [
+        65,
+        720
+      ],
+      "hemR": [
+        395,
+        720
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "knee"
+    }
+  },
+  {
+    "id": "dress-coral-01",
+    "category": "dress",
+    "image": "/garments/dress-coral-01.png",
+    "anchors": {
+      "shoulderL": [
+        152,
+        55
+      ],
+      "shoulderR": [
+        328,
+        55
+      ],
+      "waistL": [
+        172,
+        300
+      ],
+      "waistR": [
+        308,
+        300
+      ],
+      "hemL": [
+        65,
+        740
+      ],
+      "hemR": [
+        415,
+        740
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "knee"
+    }
+  },
+  {
+    "id": "dress-navy-02",
+    "category": "dress",
+    "image": "/garments/dress-navy-02.png",
+    "anchors": {
+      "shoulderL": [
+        150,
+        55
+      ],
+      "shoulderR": [
+        330,
+        55
+      ],
+      "waistL": [
+        162,
+        290
+      ],
+      "waistR": [
+        318,
+        290
+      ],
+      "hemL": [
+        90,
+        900
+      ],
+      "hemR": [
+        390,
+        900
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "ankle"
+    }
+  }
+]

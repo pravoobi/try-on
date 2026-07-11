@@ -25,4 +25,17 @@ export const config = {
     'photo-04.jpg',
     'photo-05.jpg',
   ],
+  anchors: {
+    /** Fraction of the way from shoulder to hip where the waist anchor sits. */
+    waistT: 0.55,
+    /**
+     * Hem placement when the knee/ankle keypoint is missing or unconfident:
+     * hem_y = hip_y + torsoHeight * multiplier, per meta.length.
+     */
+    hemFallbackMultiplier: { hip: 0.15, knee: 1.0, ankle: 1.9 },
+  },
+  /** TPS warp evaluation grid (see pipeline/warp.ts). */
+  warpGrid: { cols: 16, rows: 24 },
+  /** Arm-occlusion capsule radius, as a fraction of shoulder-to-shoulder width. */
+  armOcclusionRadiusFactor: 0.14,
 } as const;

@@ -76,3 +76,34 @@ button:disabled {
   border-radius: 8px;
   border: 1px solid #374151;
 }
+
+.garment-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.garment-thumb {
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+}
+
+.garment-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.garment-thumb-none {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.garment-thumb.selected {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}

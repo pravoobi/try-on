@@ -58,6 +58,26 @@ export interface Keypoint {
 
 export type Accelerator = 'webgpu' | 'wasm';
 
+// ---------------------------------------------------------------------------
+// Garment anchoring (shared between garments/schema.ts and the body-side
+// anchor mapping in pipeline/anchorMapping.ts — both are "6 named points",
+// just in different coordinate spaces: garment-image pixels vs frame pixels)
+// ---------------------------------------------------------------------------
+
+export const ANCHOR_NAMES = ['shoulderL', 'shoulderR', 'waistL', 'waistR', 'hemL', 'hemR'] as const;
+
+export type AnchorName = (typeof ANCHOR_NAMES)[number];
+
+export type Point = readonly [number, number];
+
+export type GarmentAnchors = Record<AnchorName, Point>;
+
+/** Same shape as GarmentAnchors, but in frame/body pixel space — the TPS warp target. */
+export type BodyAnchors = GarmentAnchors;
+
+/** How far below the hips a garment's hem falls (see CLAUDE.md garment data model). */
+export type HemLength = 'hip' | 'knee' | 'ankle';
+
 export interface PipelineTimings {
   segmentMs: number;
   poseMs: number;
