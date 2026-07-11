@@ -1,9 +1,32 @@
 # Plan: AI-powered 3D-ish garment assets (depth-augmented try-on, user-uploaded garments)
 
-**Status:** feasibility-checked, not started. This document is written for an
-implementing agent/model with access to this repo; it assumes CLAUDE.md has
-been read. Verify library APIs at build time — the browser-ML ecosystem moves
-fast.
+**Status:** Phase A1 done (commit `c8b7adc`). Phases A2-A5 not started. This
+document is written for an implementing agent/model with access to this
+repo; it assumes CLAUDE.md has been read. Verify library APIs at build time
+— the browser-ML ecosystem moves fast.
+
+**Phase A1 implementation notes (for whoever builds A2+):**
+- `useAdvancedMode` (src/hooks/useAdvancedMode.ts) is the gate — `enabled`
+  persisted to localStorage, owns the depth.worker.ts lifecycle, exposes
+  `estimateDepth(bitmap): Promise<ImageBitmap>`. A2/A3 should extend this
+  hook (or add sibling hooks) rather than duplicating its worker-lifecycle
+  pattern.
+- `depth.worker.ts` uses `@huggingface/transformers`'
+  `onnx-community/depth-anything-v2-small`, `device: 'webgpu'|'wasm'`
+  (feature-detected via `'gpu' in navigator`), `dtype: 'fp16'` on webgpu
+  / library default (q8) on wasm. Wasm inference on this model is slow
+  (~30s observed for a single portrait-sized photo) — A5's live-mode
+  throttling is load-bearing, not optional, and even A2/A3's photo-mode
+  work should keep this in mind for UX (show a "computing…" state).
+  `progress_callback` events give `{loaded, total}` per file but not a
+  file identifier usable for a precise multi-file progress bar; the
+  current aggregate-across-events approach is an approximation, good
+  enough for a progress percentage but worth revisiting if it looks wrong
+  for a multi-file model.
+- The depth debug view (DebugCanvas `depthBitmap` prop) is a full-canvas
+  replacement, not a tint — A2's per-pixel occlusion and A3's relighting
+  will need their own compositor-level access to the depth map (via
+  `useAdvancedMode.estimateDepth`), not this debug overlay path.
 
 ## 1. Problem statement (from the product owner)
 
