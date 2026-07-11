@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { assetUrl } from '../assetUrl';
 import { config } from '../config';
 import type {
   Accelerator,
@@ -70,8 +71,11 @@ export function usePipeline(accelerator: Accelerator): UsePipeline {
 
     const init: WorkerRequest = {
       type: 'init',
-      wasmPath: config.litertWasmPath,
-      modelPaths: config.models,
+      wasmPath: assetUrl(config.litertWasmPath),
+      modelPaths: {
+        segmenter: assetUrl(config.models.segmenter),
+        pose: assetUrl(config.models.pose),
+      },
       accelerator,
     };
     worker.postMessage(init);

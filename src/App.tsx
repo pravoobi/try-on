@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { assetUrl } from './assetUrl';
 import { DebugCanvas } from './components/DebugCanvas';
 import { GarmentPicker } from './components/GarmentPicker';
+import { PerfStats } from './components/PerfStats';
 import { config } from './config';
 import type { Garment } from './garments/schema';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
@@ -101,7 +103,7 @@ export default function App() {
     setGarmentError(null);
     void (async () => {
       try {
-        const res = await fetch(selectedGarment.image);
+        const res = await fetch(assetUrl(selectedGarment.image));
         if (!res.ok) throw new Error(`fetch ${selectedGarment.image} failed: ${res.status}`);
         const bitmap = await createImageBitmap(await res.blob());
         if (cancelled) {
@@ -128,7 +130,7 @@ export default function App() {
 
   const onTestPhoto = async (name: string) => {
     setRunError(null);
-    const res = await fetch(`/test-photos/${name}`);
+    const res = await fetch(assetUrl(`/test-photos/${name}`));
     if (!res.ok) {
       setRunError(`could not load ${name} — run \`npm run fetch-test-photos\` first`);
       return;
@@ -150,37 +152,27 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>Virtual Try-On — Phase 3: live webcam</h1>
+        <h1>Virtual Try-On</h1>
         <p className="status">
           {pipeline.status === 'loading' && 'Loading models…'}
           {pipeline.status === 'error' && <span className="error">init failed: {pipeline.error}</span>}
-          {pipeline.status === 'ready' && (
-            <>
-              backend: <strong className={pipeline.backend === 'webgpu' ? 'ok' : 'warn'}>
-                {pipeline.backend}
-              </strong>
-              {' · '}init {Math.round(pipeline.initMs ?? 0)} ms
-              {mode === 'photo' && result && (
-                <>
-                  {' · '}seg {result.timings.segmentMs.toFixed(1)} ms
-                  {' · '}pose {result.timings.poseMs.toFixed(1)} ms
-                </>
-              )}
-              {mode === 'live' && live.latest && (
-                <>
-                  {' · '}
-                  <strong className={live.fps >= config.targetFps * 0.7 ? 'ok' : 'warn'}>
-                    {live.fps.toFixed(1)} fps
-                  </strong>
-                  {' · seg '}
-                  {live.latest.result.timings.segmentMs.toFixed(1)} ms{' · pose '}
-                  {live.latest.result.timings.poseMs.toFixed(1)} ms
-                </>
-              )}
-            </>
-          )}
+          {pipeline.status === 'ready' && `init ${Math.round(pipeline.initMs ?? 0)} ms`}
         </p>
       </header>
+
+      {pipeline.status === 'ready' && (
+        <PerfStats
+          accelerator={accelerator}
+          onAcceleratorChange={setAccelerator}
+          backend={pipeline.backend}
+          fps={mode === 'live' && live.latest ? live.fps : null}
+          timings={
+            mode === 'photo'
+              ? (result?.timings ?? null)
+              : (live.latest?.result.timings ?? null)
+          }
+        />
+      )}
 
       <div className="controls">
         <label>
@@ -188,16 +180,6 @@ export default function App() {
           <select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
             <option value="photo">photo</option>
             <option value="live">live webcam</option>
-          </select>
-        </label>
-        <label>
-          accelerator{' '}
-          <select
-            value={accelerator}
-            onChange={(e) => setAccelerator(e.target.value as Accelerator)}
-          >
-            <option value="webgpu">webgpu</option>
-            <option value="wasm">wasm (cpu)</option>
           </select>
         </label>
         <label>

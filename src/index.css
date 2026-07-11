@@ -107,3 +107,75 @@ button:disabled {
   border-color: #2563eb;
   box-shadow: 0 0 0 1px #2563eb;
 }
+
+.perf-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented button {
+  border: none;
+  border-radius: 0;
+  background: #1f2430;
+}
+
+.segmented button + button {
+  border-left: 1px solid #374151;
+}
+
+.segmented button.selected {
+  background: #2563eb;
+  color: white;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  min-width: 4.5rem;
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: #898781;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.good {
+  background: #0ca30c;
+}
+
+.status-dot.warn {
+  background: #fab219;
+}

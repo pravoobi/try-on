@@ -40,7 +40,11 @@ export function useLiveTryOn(
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     let prevKeypoints: Keypoint[] | null = null;
     let lastTick: number | null = null;
+    let emaFps = 0;
     const targetIntervalMs = 1000 / config.targetFps;
+    // Smooth the displayed fps too — the instantaneous per-tick rate swings
+    // a lot (GC pauses, video frame timing) and reads as noisy in a demo.
+    const FPS_EMA_ALPHA = 0.25;
 
     const clear = (f: LiveFrame | null) => {
       f?.frame.close();
@@ -69,7 +73,11 @@ export function useLiveTryOn(
           setLatest(next);
 
           const now = performance.now();
-          if (lastTick !== null && now > lastTick) setFps(1000 / (now - lastTick));
+          if (lastTick !== null && now > lastTick) {
+            const instFps = 1000 / (now - lastTick);
+            emaFps = emaFps === 0 ? instFps : FPS_EMA_ALPHA * instFps + (1 - FPS_EMA_ALPHA) * emaFps;
+            setFps(emaFps);
+          }
           lastTick = now;
         }
         if (!cancelled) setError(null);

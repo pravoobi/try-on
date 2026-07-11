@@ -1,3 +1,4 @@
+import { assetUrl } from '../assetUrl';
 import type { Garment } from '../garments/schema';
 
 interface Props {
@@ -22,7 +23,7 @@ export function GarmentPicker({ garments, selectedId, onSelect }: Props) {
           onClick={() => onSelect(g)}
           title={`${g.id} (${g.category}, ${g.meta.sleeves}, ${g.meta.length}-length)`}
         >
-          <img src={g.image} alt={g.id} />
+          <img src={assetUrl(g.image)} alt={g.id} />
         </button>
       ))}
     </div>
