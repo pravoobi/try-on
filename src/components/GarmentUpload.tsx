@@ -31,6 +31,34 @@ const UPLOAD_CATEGORIES = GARMENT_CATEGORIES.filter(
   (c): c is Exclude<GarmentCategory, 'lehenga-choli'> => c !== 'lehenga-choli',
 );
 
+type UploadCategory = Exclude<GarmentCategory, 'lehenga-choli'>;
+
+/** Typical hem length per category — applied when the user changes the
+ * category select, since length (not category) is what actually drives how
+ * far the garment hangs on the body when rendered (see
+ * pipeline/anchorMapping.ts computeHem). Still editable afterward. */
+const CATEGORY_DEFAULT_LENGTH: Record<UploadCategory, HemLength> = {
+  top: 'hip',
+  kurti: 'knee',
+  dress: 'knee',
+  saree: 'ankle',
+};
+
+/**
+ * Suggests category + hem length from the cropped garment silhouette's
+ * proportions: a top is roughly as tall as it is wide, a knee-length dress
+ * is noticeably taller, a full-length gown taller still. A starting point
+ * only — the selects stay editable, and getting `length` right matters
+ * more than `category` (length is what makes it render as a dress rather
+ * than stopping at the hips).
+ */
+function suggestMeta(w: number, h: number): { category: UploadCategory; length: HemLength } {
+  const ratio = h / Math.max(1, w);
+  if (ratio >= 1.9) return { category: 'dress', length: 'ankle' };
+  if (ratio >= 1.3) return { category: 'dress', length: 'knee' };
+  return { category: 'top', length: 'hip' };
+}
+
 function fallbackAnchors(w: number, h: number): GarmentAnchors {
   return {
     shoulderL: [w * 0.2, h * 0.05],
@@ -106,6 +134,9 @@ export function GarmentUpload({ onGarmentAdded }: Props) {
         setStep({ kind: 'front-select' });
         return;
       }
+      const suggested = suggestMeta(front.image.width, front.image.height);
+      setCategory(suggested.category);
+      setLength(suggested.length);
       setStep({ kind: 'front-edit', front });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -198,7 +229,10 @@ export function GarmentUpload({ onGarmentAdded }: Props) {
 
       {step.kind === 'front-edit' && (
         <>
-          <p className="hint">drag the yellow markers to fine-tune the anchors, then set the details below.</p>
+          <p className="hint">
+            drag the yellow markers to fine-tune the anchors, then set the details below —
+            "length" is what decides how far it hangs on the body (hip ≈ top, knee/ankle ≈ dress).
+          </p>
           <AnchorEditor
             image={step.front.image}
             anchors={step.front.anchors}
@@ -207,7 +241,14 @@ export function GarmentUpload({ onGarmentAdded }: Props) {
           <div className="controls">
             <label>
               category{' '}
-              <select value={category} onChange={(e) => setCategory(e.target.value as typeof category)}>
+              <select
+                value={category}
+                onChange={(e) => {
+                  const next = e.target.value as UploadCategory;
+                  setCategory(next);
+                  setLength(CATEGORY_DEFAULT_LENGTH[next]);
+                }}
+              >
                 {UPLOAD_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
