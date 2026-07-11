@@ -4,14 +4,21 @@ import { GarmentPicker } from './components/GarmentPicker';
 import { config } from './config';
 import type { Garment } from './garments/schema';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
+import { useLiveTryOn } from './hooks/useLiveTryOn';
 import { usePipeline } from './hooks/usePipeline';
+import { useWebcam } from './hooks/useWebcam';
 import type { TryOnStatus } from './pipeline/compositor';
 import type { Accelerator, PipelineResult } from './pipeline/types';
 
+type Mode = 'photo' | 'live';
+
 export default function App() {
+  const [mode, setMode] = useState<Mode>('photo');
   const [accelerator, setAccelerator] = useState<Accelerator>('webgpu');
   const pipeline = usePipeline(accelerator);
   const catalog = useGarmentCatalog();
+  const webcam = useWebcam();
+  const live = useLiveTryOn(pipeline, webcam.videoEl, mode === 'live');
   const [image, setImage] = useState<ImageBitmap | null>(null);
   const [result, setResult] = useState<PipelineResult | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -67,11 +74,19 @@ export default function App() {
   // Re-process the current photo when the worker (re)becomes ready,
   // e.g. after switching accelerator.
   useEffect(() => {
-    if (pipeline.status === 'ready' && imageRef.current) {
+    if (mode === 'photo' && pipeline.status === 'ready' && imageRef.current) {
       void run(imageRef.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pipeline.status, run]);
+  }, [mode, pipeline.status, run]);
+
+  // Start/stop the camera as the mode toggles.
+  useEffect(() => {
+    setTryOnStatus(null);
+    if (mode === 'live') void webcam.start();
+    else webcam.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   // Load the selected garment's PNG into an ImageBitmap for the compositor.
   useEffect(() => {
@@ -129,10 +144,13 @@ export default function App() {
     [selectedGarment, garmentBitmap],
   );
 
+  const displayImage = mode === 'live' ? (live.latest?.frame ?? null) : image;
+  const displayResult = mode === 'live' ? (live.latest?.result ?? null) : result;
+
   return (
     <div className="app">
       <header>
-        <h1>Virtual Try-On — Phase 2: garment overlay</h1>
+        <h1>Virtual Try-On — Phase 3: live webcam</h1>
         <p className="status">
           {pipeline.status === 'loading' && 'Loading models…'}
           {pipeline.status === 'error' && <span className="error">init failed: {pipeline.error}</span>}
@@ -142,10 +160,21 @@ export default function App() {
                 {pipeline.backend}
               </strong>
               {' · '}init {Math.round(pipeline.initMs ?? 0)} ms
-              {result && (
+              {mode === 'photo' && result && (
                 <>
                   {' · '}seg {result.timings.segmentMs.toFixed(1)} ms
                   {' · '}pose {result.timings.poseMs.toFixed(1)} ms
+                </>
+              )}
+              {mode === 'live' && live.latest && (
+                <>
+                  {' · '}
+                  <strong className={live.fps >= config.targetFps * 0.7 ? 'ok' : 'warn'}>
+                    {live.fps.toFixed(1)} fps
+                  </strong>
+                  {' · seg '}
+                  {live.latest.result.timings.segmentMs.toFixed(1)} ms{' · pose '}
+                  {live.latest.result.timings.poseMs.toFixed(1)} ms
                 </>
               )}
             </>
@@ -155,6 +184,13 @@ export default function App() {
 
       <div className="controls">
         <label>
+          mode{' '}
+          <select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
+            <option value="photo">photo</option>
+            <option value="live">live webcam</option>
+          </select>
+        </label>
+        <label>
           accelerator{' '}
           <select
             value={accelerator}
@@ -163,9 +199,6 @@ export default function App() {
             <option value="webgpu">webgpu</option>
             <option value="wasm">wasm (cpu)</option>
           </select>
-        </label>
-        <label>
-          <input type="file" accept="image/*" onChange={onFile} disabled={pipeline.status !== 'ready'} />
         </label>
         <label>
           <input type="checkbox" checked={showMask} onChange={(e) => setShowMask(e.target.checked)} />
@@ -181,18 +214,33 @@ export default function App() {
         </label>
       </div>
 
-      <div className="controls">
-        <span className="hint">test photos:</span>
-        {config.testPhotos.map((name) => (
-          <button
-            key={name}
-            onClick={() => void onTestPhoto(name)}
-            disabled={pipeline.status !== 'ready'}
-          >
-            {name.replace(/\.(jpg|png)$/, '')}
-          </button>
-        ))}
-      </div>
+      {mode === 'photo' && (
+        <div className="controls">
+          <label>
+            <input type="file" accept="image/*" onChange={onFile} disabled={pipeline.status !== 'ready'} />
+          </label>
+          <span className="hint">test photos:</span>
+          {config.testPhotos.map((name) => (
+            <button
+              key={name}
+              onClick={() => void onTestPhoto(name)}
+              disabled={pipeline.status !== 'ready'}
+            >
+              {name.replace(/\.(jpg|png)$/, '')}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mode === 'live' && (
+        <div className="controls">
+          <span className="hint">
+            {webcam.status === 'requesting' && 'requesting camera access…'}
+            {webcam.status === 'ready' && pipeline.status === 'ready' && !live.latest && 'starting live inference…'}
+            {webcam.status === 'error' && <span className="error">camera error: {webcam.error}</span>}
+          </span>
+        </div>
+      )}
 
       <div className="controls">
         <span className="hint">garment:</span>
@@ -208,6 +256,7 @@ export default function App() {
       </div>
 
       {runError && <p className="error">{runError}</p>}
+      {live.error && <p className="error">live inference error: {live.error}</p>}
       {garmentError && <p className="error">garment load failed: {garmentError}</p>}
       {processing && <p className="hint">running inference…</p>}
       {tryOnStatus === 'pose-not-anchorable' && (
@@ -217,17 +266,21 @@ export default function App() {
       )}
 
       <main>
-        {image ? (
+        {displayImage ? (
           <DebugCanvas
-            image={image}
-            result={result}
+            image={displayImage}
+            result={displayResult}
             showMask={showMask}
             showSkeleton={showSkeleton}
             garment={garmentOverlay}
             onTryOnStatus={setTryOnStatus}
           />
         ) : (
-          <p className="hint">Upload a photo or pick a test photo to run the pipeline.</p>
+          <p className="hint">
+            {mode === 'photo'
+              ? 'Upload a photo or pick a test photo to run the pipeline.'
+              : 'Waiting for camera…'}
+          </p>
         )}
       </main>
     </div>
