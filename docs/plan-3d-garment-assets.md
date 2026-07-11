@@ -2,10 +2,11 @@
 
 **Status:** Phases A1 (`c8b7adc`), A2 (`7396edc`), A3 (`afee4a1`, which also
 reworked A2's occlusion reference — see the A2 notes below, updated to
-match), and A4 (user garment upload) are done. Phase A5 not started. This
-document is written for an implementing agent/model with access to this
-repo; it assumes CLAUDE.md has been read. Verify library APIs at build time
-— the browser-ML ecosystem moves fast.
+match), A4 (user garment upload), and A5 (orientation-aware warp, view
+selection, live-mode depth throttling) are done — this completes the Tier A
+build. This document is written for an implementing agent/model with access
+to this repo; it assumes CLAUDE.md has been read. Verify library APIs at
+build time — the browser-ML ecosystem moves fast.
 
 **Phase A1 implementation notes (for whoever builds A2+):**
 - `useAdvancedMode` (src/hooks/useAdvancedMode.ts) is the gate — `enabled`
@@ -149,6 +150,116 @@ repo; it assumes CLAUDE.md has been read. Verify library APIs at build time
   sleeve/length selects, IndexedDB persistence across a full page reload,
   and try-on compositing (identical code path to catalog garments) all
   confirmed working with no console errors.
+
+**Phase A5 implementation notes:**
+- **Yaw heuristic is 2D-only, as the plan sanctioned as an interim** — the
+  app still runs MoveNet (no z), not BlazePose, so `pipeline/orientation.ts`
+  estimates only |yaw| (magnitude, 0-180°, no signed left/right) from two
+  signals: shoulder width relative to a running "most-frontal-observed"
+  calibration (`updateOrientationCalibration`, grows instantly on a wider
+  confidently-frontal frame, else decays slowly — `config.orientation.
+  calibrationDecay` — so a stale high-water-mark relaxes rather than
+  permanently reading normal frames as "turned"), disambiguated near 180°
+  by nose/eye keypoint confidence dropping out (the 2D stand-in for the
+  plan's "landmark z-order flips ... visibility scores drop" signal). BlazePose
+  was NOT adopted — swapping the pose model was evaluated as too much risk/
+  churn for this pass; MoveNet + the width heuristic meets the phase's
+  done-when criteria. Revisit BlazePose if the heuristic proves too noisy
+  in practice.
+- **Orientation is live-mode only, by design, not merely by convenience:** a
+  single photo has no prior frame to calibrate a "frontal" baseline
+  against, so `hooks/useTorsoOrientation.ts` only produces a non-null
+  result while its `active` flag is true, and resets calibration on every
+  false→true transition (fresh session, no stale baseline from a previous
+  photo/person/distance). Photo mode is therefore provably unaffected:
+  `foreshortenFactor` defaults to 1 and `viewAlpha` to 1 whenever
+  orientation is null — verified both by the zero-diff behavior in
+  `selectGarmentView(null, ...)` (unit tested) and by a live Chrome check
+  (identical render before/after, no console errors).
+- **View selection doesn't key off the discrete `zone` label** — an early
+  version gated the back-view crossfade on `zone === 'back'`, which only
+  ever produces `alpha === 1` immediately since the zone boundary and the
+  ramp's own endpoint coincide (caught by a unit test). Fixed by having
+  `selectGarmentView` compute its own yaw-threshold logic directly: the
+  back view starts crossfading in `fadeRampDeg` degrees *before* the
+  nominal `backMinYawDeg` threshold, reaching full opacity exactly at it —
+  a continuous front-fades-out-then-back-fades-in handoff through the
+  profile band, never a hard pop. `TorsoOrientation.zone` remains a useful
+  coarse label for the live debug readout, just isn't consulted by
+  rendering decisions.
+- **Foreshortening is a 2D horizontal squeeze, not the plan's depth-weighted
+  asymmetric version** — `anchorMapping.foreshortenAnchors(anchors, factor)`
+  compresses all anchor x-coordinates toward the set's own centroid by
+  `factor = pipeline/orientation.ts's foreshortenFactor(yawDeg, floor)`
+  (1 at front/back, floor at deep profile, symmetric around 90°); y is
+  untouched. The plan's §5.4.3 "weight by depth map so the near side scales
+  up" asymmetric refinement was deliberately skipped — the phase's
+  done-when only asks for *plausible* foreshortening, and this is applied
+  uniformly to `bodyAnchors` (renderTryOn) and both `choliBody`/`skirtBody`
+  (renderLehengaCholiTryOn) before the existing TPS solve, so it's a small,
+  contained addition rather than a warp-pipeline rewrite. Revisit if a
+  strongly-leaning/asymmetric pose ever needs it.
+- **Back-view anchor mirroring is a fixed rule, not dynamic detection** —
+  `anchorMapping.mirrorAnchorsLR` swaps L/R-named anchors unconditionally
+  whenever a garment's `back` piece is rendered (see App.tsx's
+  `garmentOverlay` memo), per the plan's own instruction ("the person's
+  left shoulder anchors the back image's right-side anchor"). This does
+  NOT depend on whatever the pose model's L/R keypoint labeling is doing
+  at that moment (which the plan itself notes gets unreliable near 180°) —
+  it's a static convention applied only when swapping which *image* to
+  render, keeping `computeBodyAnchors` itself completely unaware of
+  front/back.
+- **`compositor.ts` stays agnostic to "front vs back" and to the `Garment`
+  schema entirely** — `renderTryOn`/`renderLehengaCholiTryOn` gained two
+  plain numeric knobs (`foreshortenFactor`, `viewAlpha`, both optional,
+  default to a no-op) and know nothing about which image was chosen or why.
+  All the "which piece, mirrored how" decision-making lives in App.tsx,
+  which already owns `Garment`-typed state. `viewAlpha` is applied via
+  `ctx.save()/globalAlpha/ctx.restore()` wrapped *only* around the garment
+  layer's own draw call — occlusion patches (which restore original,
+  fully-opaque frame pixels) are drawn after `restore()` and are therefore
+  never faded, which matters: a faded-out arm-occlusion patch would look
+  like a ghost limb.
+- **Live-mode person depth is genuinely new, not just throttled** — before
+  this phase, live mode had zero person-depth signal (occlusion always used
+  the arm-capsule fallback, shading never got the depth-driven AO term)
+  even with advanced mode on; `personDepthBitmap` in App.tsx only ever fed
+  from photo-mode's `photoDepth`. `hooks/useLiveDepth.ts` adds this for live
+  mode: its own ~5fps timer (independent of the ~15fps pose loop),
+  downscaling the latest live frame to `config.liveDepth.maxDim` (256px)
+  before calling `estimateDepth`, holding the previous result between
+  ticks. WebGPU-only by construction (`enabled` requires
+  `advanced.device === 'webgpu'`) — on wasm, depth is ~30s/frame (A1
+  notes), so the hook simply never fires and live mode keeps today's
+  arm-capsule/unshaded fallback, matching §5.5 exactly. No compositor
+  changes were needed to consume a downscaled depth map: both
+  `applyDepthOcclusion` and `applyGarmentShading` already scale `personDepth`
+  up to the frame's own resolution via `drawImage(personDepth, 0, 0, w, h)`.
+- **Back-view assets also get their own normal map** — extended the
+  existing Phase A3 normal-map effect in App.tsx (same pattern as the
+  lehenga-choli two-piece case) so a single-piece garment's `back` photo,
+  when present, gets its own depth→normal pass too, used automatically
+  whenever the live-mode back view is active. Not required by the phase's
+  done-when, but skipping it would have made the back view visibly flatter
+  than the front whenever shading is on — a jarring inconsistency for a
+  feature literally about making orientation changes look natural.
+- **Verification gap, stated plainly:** the sandboxed browser environment
+  used to check this phase has no camera device, so the actual "turn
+  around slowly and watch the garment foreshorten/fade/show its back" user
+  experience could not be visually confirmed end-to-end. What WAS verified:
+  all 24 new unit tests (`orientation.test.ts`, `anchorMapping.test.ts`)
+  covering calibration growth/decay, the front/profile/back view-selection
+  table (including the crossfade-ramp bug caught above), and the
+  foreshorten-factor shape; a live Chrome check that photo mode is
+  pixel-for-pixel unaffected (advanced mode + shading + a user-uploaded
+  garment all render exactly as before) with zero console errors; and that
+  toggling into/out of live mode (with the resulting camera-permission
+  request left permanently unresolved, since no camera exists to grant)
+  neither crashes nor logs errors. Whoever next has access to a real webcam
+  should walk through the phase's actual done-when checklist (foreshorten
+  to ±40°, full turn shows the back view for a back-capable asset,
+  fade+hint for front-only, no smeared garment in the profile band) before
+  fully trusting this phase in production.
 
 ## 1. Problem statement (from the product owner)
 
