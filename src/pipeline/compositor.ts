@@ -1,14 +1,18 @@
 /**
  * Composites a warped garment onto a photo: frame → warped garment (clipped
  * to the feathered person mask, so fabric never spills onto the background)
- * → arm-occlusion patches (approximate "arms in front of fabric" — see
- * CLAUDE.md Phase 2 occlusion note).
+ * → occlusion patches restoring frame pixels wherever the person is in front
+ * of the fabric. Occlusion has two implementations (see applyDepthOcclusion
+ * vs drawArmOcclusion below): depth-tested when an advanced-mode person
+ * depth map is available (Phase A2), else the arm-capsule heuristic (see
+ * CLAUDE.md Phase 2 occlusion note) simple mode has always used.
  *
  * Also covers the lehenga-choli case (renderLehengaCholiTryOn): two
  * independently-photographed pieces, each warped on its own anchor set and
  * composited before the mask clip — see CLAUDE.md's garment difficulty
  * order ("treat as two garments... composite both").
  */
+import { config } from '../config';
 import { computeBodyAnchors, computeLehengaSkirtBodyAnchors } from './anchorMapping';
 import { clipToMask, openMaskBelow, renderFeatheredMask } from './maskRender';
 import {
@@ -20,7 +24,7 @@ import {
   type Point,
   type SkirtAnchors,
 } from './types';
-import { renderGarmentWarp, type WarpGridOptions } from './warp';
+import { renderGarmentWarp, ThinPlateSpline, type WarpGridOptions } from './warp';
 
 type Canvas2DContext = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
 
@@ -33,8 +37,12 @@ export interface TryOnInput {
   hemLength: HemLength;
   warpGrid?: WarpGridOptions;
   armOcclusion?: boolean;
-  /** Fraction of shoulder-to-shoulder width used as the occlusion capsule radius. */
+  /** Fraction of shoulder-to-shoulder width used as the occlusion capsule radius (fallback path only). */
   armOcclusionRadiusFactor?: number;
+  /** Advanced-mode person depth map (Phase A2) — when present, occlusion is
+   * depth-tested per-pixel instead of the arm-capsule heuristic. Same pixel
+   * dimensions as `frame`. */
+  personDepth?: ImageBitmap | null;
 }
 
 export type TryOnStatus = 'ok' | 'pose-not-anchorable';
@@ -85,7 +93,11 @@ export function renderTryOn(ctx: Canvas2DContext, input: TryOnInput): TryOnStatu
   ctx.drawImage(clipped, 0, 0);
 
   if (input.armOcclusion !== false) {
-    drawArmOcclusion(ctx, frame, keypoints, bodyAnchors, input.armOcclusionRadiusFactor ?? 0.14);
+    if (input.personDepth) {
+      applyDepthOcclusion(ctx, frame, input.personDepth, keypoints, bodyAnchors, w, h);
+    } else {
+      drawArmOcclusion(ctx, frame, keypoints, bodyAnchors, input.armOcclusionRadiusFactor ?? 0.14);
+    }
   }
 
   return 'ok';
@@ -104,6 +116,7 @@ export interface LehengaCholiTryOnInput {
   warpGrid?: WarpGridOptions;
   armOcclusion?: boolean;
   armOcclusionRadiusFactor?: number;
+  personDepth?: ImageBitmap | null;
 }
 
 /**
@@ -156,7 +169,11 @@ export function renderLehengaCholiTryOn(ctx: Canvas2DContext, input: LehengaChol
   ctx.drawImage(clipped, 0, 0);
 
   if (input.armOcclusion !== false) {
-    drawArmOcclusion(ctx, frame, keypoints, choliBody, input.armOcclusionRadiusFactor ?? 0.14);
+    if (input.personDepth) {
+      applyDepthOcclusion(ctx, frame, input.personDepth, keypoints, choliBody, w, h);
+    } else {
+      drawArmOcclusion(ctx, frame, keypoints, choliBody, input.armOcclusionRadiusFactor ?? 0.14);
+    }
   }
 
   return 'ok';
@@ -173,11 +190,126 @@ function overlapsBBox(x: number, y: number, box: ReturnType<typeof anchorBBox>):
   return x >= box.minX && x <= box.maxX && y >= box.minY && y <= box.maxY;
 }
 
+/** anchorBBox expanded by a fraction of its own size and clamped to the frame — hands, hair, and held objects typically extend past the torso anchors themselves. */
+function expandedAnchorBBox(
+  anchors: GarmentAnchors,
+  marginFrac: number,
+  maxW: number,
+  maxH: number,
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  const box = anchorBBox(anchors);
+  const mx = (box.maxX - box.minX) * marginFrac;
+  const my = (box.maxY - box.minY) * marginFrac;
+  return {
+    minX: Math.max(0, box.minX - mx),
+    minY: Math.max(0, box.minY - my),
+    maxX: Math.min(maxW, box.maxX + mx),
+    maxY: Math.min(maxH, box.maxY + my),
+  };
+}
+
+/**
+ * Depth-tested occlusion (Phase A2 — used whenever an advanced-mode person
+ * depth map is available): restores original frame pixels anywhere the
+ * person is measurably closer to the camera than the garment's own
+ * surface, so arms, hair, and held objects occlude the fabric correctly
+ * wherever they actually are in the photo — not just along the forearm
+ * segment the arm-capsule fallback special-cases.
+ *
+ * The garment has no real depth geometry, so its "surface" is approximated
+ * as a smooth field interpolated — via the same TPS math the warp itself
+ * uses, just with a scalar (depth) target instead of a 2D point — from the
+ * person's own measured depth at each body anchor: the torso's actual
+ * depth stands in for "roughly where the fabric sits".
+ */
+function applyDepthOcclusion(
+  ctx: Canvas2DContext,
+  frame: ImageBitmap,
+  personDepth: ImageBitmap,
+  keypoints: readonly Keypoint[],
+  bodyAnchors: GarmentAnchors,
+  w: number,
+  h: number,
+): void {
+  const box = expandedAnchorBBox(bodyAnchors, config.depthOcclusion.bboxMarginFrac, w, h);
+  const bx = Math.floor(box.minX);
+  const by = Math.floor(box.minY);
+  const bw = Math.ceil(box.maxX) - bx;
+  const bh = Math.ceil(box.maxY) - by;
+  if (bw <= 0 || bh <= 0) return;
+
+  const depthCanvas = new OffscreenCanvas(w, h);
+  const depthCtx = depthCanvas.getContext('2d');
+  if (!depthCtx) return;
+  depthCtx.drawImage(personDepth, 0, 0, w, h);
+  const depthData = depthCtx.getImageData(bx, by, bw, bh).data;
+
+  const depthAt = (x: number, y: number): number => {
+    const cx = Math.min(bw - 1, Math.max(0, Math.round(x - bx)));
+    const cy = Math.min(bh - 1, Math.max(0, Math.round(y - by)));
+    return depthData[(cy * bw + cx) * 4]; // grayscale depth map: R channel carries the value.
+  };
+
+  // The depth field's control points must be real on-body locations. The
+  // garment anchor targets (bodyAnchors) are deliberately widened past the
+  // body's own edge for fit (see config.anchors.widthScale) — sampling
+  // depth there can land in the background and drag the whole reference
+  // surface down, making nearly the entire torso register as "occluded".
+  // The raw pose keypoints are guaranteed on the body.
+  const byName = new Map(keypoints.map((k) => [k.name, k] as const));
+  const torsoPoints: Point[] = [];
+  for (const name of ['left_shoulder', 'right_shoulder', 'left_hip', 'right_hip'] as const) {
+    const kp = byName.get(name);
+    if (kp && kp.score >= config.minKeypointScore) torsoPoints.push([kp.x, kp.y]);
+  }
+  if (torsoPoints.length < 3) return; // not enough for a TPS fit; skip occlusion this frame.
+
+  // A degenerate TPS: solving for a scalar (depth) target by holding the
+  // second output dimension at 0 reuses ThinPlateSpline's X-solve exactly
+  // as a scalar interpolant (its X/Y solves are already independent).
+  const depthField = new ThinPlateSpline(
+    torsoPoints,
+    torsoPoints.map(([x, y]): Point => [depthAt(x, y), 0]),
+  );
+
+  const { marginGray, softBandGray } = config.depthOcclusion;
+  const maskData = new Uint8ClampedArray(bw * bh * 4);
+  for (let y = 0; y < bh; y++) {
+    for (let x = 0; x < bw; x++) {
+      const personVal = depthData[(y * bw + x) * 4];
+      const garmentVal = depthField.eval([bx + x, by + y])[0];
+      // Soft threshold: fully occluded well past the margin, fully fabric
+      // well before it, a smooth ramp across the band between.
+      const t = (personVal - (garmentVal + marginGray)) / softBandGray;
+      const alpha = Math.max(0, Math.min(1, t));
+      const i = (y * bw + x) * 4;
+      maskData[i] = 255;
+      maskData[i + 1] = 255;
+      maskData[i + 2] = 255;
+      maskData[i + 3] = Math.round(alpha * 255);
+    }
+  }
+
+  const maskCanvas = new OffscreenCanvas(bw, bh);
+  const maskCtx = maskCanvas.getContext('2d');
+  if (!maskCtx) return;
+  maskCtx.putImageData(new ImageData(maskData, bw, bh), 0, 0);
+
+  const framePatch = new OffscreenCanvas(bw, bh);
+  const framePatchCtx = framePatch.getContext('2d');
+  if (!framePatchCtx) return;
+  framePatchCtx.drawImage(frame, bx, by, bw, bh, 0, 0, bw, bh);
+
+  const clippedPatch = clipToMask(framePatch, bw, bh, maskCanvas);
+  ctx.drawImage(clippedPatch, bx, by);
+}
+
 /**
  * Restores original frame pixels along each forearm (elbow→wrist, extended
  * slightly past the wrist for the hand) when that arm crosses the garment's
  * bounding box — an approximation of correct depth ordering without a real
- * depth/segmentation-per-limb signal.
+ * depth/segmentation-per-limb signal. Fallback path used when no
+ * advanced-mode depth map is available (see applyDepthOcclusion above).
  */
 function drawArmOcclusion(
   ctx: Canvas2DContext,

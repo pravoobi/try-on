@@ -56,6 +56,21 @@ export const config = {
   },
   /** TPS warp evaluation grid (see pipeline/warp.ts). */
   warpGrid: { cols: 16, rows: 24 },
-  /** Arm-occlusion capsule radius, as a fraction of shoulder-to-shoulder width. */
+  /** Arm-occlusion capsule radius, as a fraction of shoulder-to-shoulder width — fallback path used when no advanced-mode depth map is available (see compositor.ts). */
   armOcclusionRadiusFactor: 0.14,
+  /**
+   * Depth-tested occlusion (Phase A2, advanced mode only): a garment has no
+   * real depth geometry, so its "surface" is approximated as a field
+   * interpolated from the person's own measured depth at each body anchor.
+   * A person pixel occludes the garment where its depth exceeds that
+   * surface by more than marginGray, ramping smoothly over softBandGray.
+   */
+  depthOcclusion: {
+    /** Scan bbox margin, as a fraction of the anchor bbox size — hands/hair typically extend past the torso anchors themselves. */
+    bboxMarginFrac: 0.5,
+    /** Gray-level tolerance before a person pixel counts as "in front of" the garment (0-255 scale). */
+    marginGray: 10,
+    /** Width, in gray levels, of the soft occlusion edge ramp. */
+    softBandGray: 18,
+  },
 } as const;

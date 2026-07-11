@@ -31,6 +31,11 @@ interface Props {
   /** Advanced-mode depth map (Phase A1) — when present, replaces the frame/garment
    * render with the depth visualization so its quality can be inspected directly. */
   depthBitmap?: ImageBitmap | null;
+  /** Advanced-mode person depth map (Phase A2) — fed to the compositor for
+   * per-pixel depth-tested occlusion instead of the arm-capsule heuristic.
+   * Independent of depthBitmap: this stays active even when the depth
+   * debug view above isn't toggled on. */
+  personDepthBitmap?: ImageBitmap | null;
   onTryOnStatus?: (status: TryOnStatus | null) => void;
 }
 
@@ -42,6 +47,7 @@ export function DebugCanvas({
   showSkeleton,
   garment,
   depthBitmap,
+  personDepthBitmap,
   onTryOnStatus,
 }: Props) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -72,6 +78,7 @@ export function DebugCanvas({
           garmentImage: garment.image,
           garmentAnchors: garment.anchors,
           hemLength: garment.hemLength,
+          personDepth: personDepthBitmap,
         });
       } else {
         tryOnStatus = renderLehengaCholiTryOn(ctx, {
@@ -83,6 +90,7 @@ export function DebugCanvas({
           lehengaImage: garment.lehengaImage,
           lehengaAnchors: garment.lehengaAnchors,
           skirtLength: garment.skirtLength,
+          personDepth: personDepthBitmap,
         });
       }
     } else {
@@ -132,7 +140,7 @@ export function DebugCanvas({
         }
       }
     }
-  }, [image, result, showMask, showSkeleton, garment, depthBitmap, onTryOnStatus]);
+  }, [image, result, showMask, showSkeleton, garment, depthBitmap, personDepthBitmap, onTryOnStatus]);
 
   return <canvas ref={ref} className="debug-canvas" />;
 }

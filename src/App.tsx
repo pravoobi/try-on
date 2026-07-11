@@ -162,11 +162,18 @@ export default function App() {
     };
   }, [selectedGarment]);
 
-  // Photo-mode depth overlay (Phase A1 scope only — live-mode depth
-  // throttling is Phase A5). Recomputes whenever the displayed photo
-  // changes while the "depth" toggle is on, or when the toggle turns on.
+  // Photo-mode person depth (Phase A1 debug view + Phase A2 depth-tested
+  // occlusion; live-mode throttling is Phase A5). Computed whenever it's
+  // actually useful — the "depth" debug toggle is on, or a garment is
+  // selected (occlusion quality improves silently even if the debug view
+  // itself is off) — and recomputed whenever the displayed photo changes.
   useEffect(() => {
-    if (!showDepth || mode !== 'photo' || advanced.status !== 'ready' || !image) {
+    if (
+      mode !== 'photo' ||
+      advanced.status !== 'ready' ||
+      !image ||
+      !(showDepth || selectedGarment)
+    ) {
       photoDepthRef.current?.close();
       photoDepthRef.current = null;
       setPhotoDepth(null);
@@ -193,7 +200,7 @@ export default function App() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showDepth, mode, advanced.status, image]);
+  }, [showDepth, mode, advanced.status, image, selectedGarment]);
 
   // Garment depth preview (Phase A1 "done when": depth maps render for
   // garment images too). Uses the garment's front/primary image — the
@@ -420,7 +427,8 @@ export default function App() {
             showMask={showMask}
             showSkeleton={showSkeleton}
             garment={garmentOverlay}
-            depthBitmap={mode === 'photo' ? photoDepth : null}
+            depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
+            personDepthBitmap={mode === 'photo' ? photoDepth : null}
             onTryOnStatus={setTryOnStatus}
           />
         ) : (
