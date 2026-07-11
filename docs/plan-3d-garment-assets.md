@@ -13,6 +13,15 @@ direction: AI-powered image-to-3D **in the browser** (depth estimation, or
 full generative image-to-3D), where **users upload garment photos** and the
 app drapes them onto their photo or live webcam.
 
+**Hard product constraints (owner decisions, not suggestions):**
+
+1. The simple app stays exactly as it is. Everything in this plan is an
+   **opt-in advanced mode behind an explicit button** — the ~50MB of extra
+   model weight must never load unless the user asks for it (§5.0).
+2. A garment's back side is shown **only when the asset provides a back
+   image** (catalog photo set or user-uploaded second photo). No back image
+   → no back rendering; never fabricate one (§5.1, §5.4.3).
+
 ## 2. Why current results look flat (diagnosis first, tech second)
 
 A 2D warp fails to convince for four reasons, in decreasing order of impact:
@@ -100,10 +109,11 @@ surprisingly large share of the "3D look" without any true 3D geometry.
 | **B** | True 3D: one-time garment→cloth-mesh conversion, three.js draping on pose-driven proxy body | Partially — server does a **one-time per-garment** conversion; browser does all per-frame work | Hybrid |
 | **C** | Full generative image-to-3D client-side | **No** (VRAM, missing ops, wrong mesh topology for cloth) | — |
 
-**Recommendation:** build Tier A now. It attacks all three root causes in §2
-that assets can't fix, needs no server, and works for user-uploaded garment
-photos. Design the garment-asset schema so Tier B slots in later without
-another migration. Reject Tier C.
+**Recommendation:** build Tier A now — as an **opt-in "advanced" mode behind
+an explicit button**, never as the default path (product owner decision; see
+§5.0). It attacks all three root causes in §2 that assets can't fix, needs no
+server, and works for user-uploaded garment photos. Design the garment-asset
+schema so Tier B slots in later without another migration. Reject Tier C.
 
 Tier B does *not* violate the zero-server-cost thesis if framed correctly:
 conversion is **per garment, one-time** (catalog garments preprocessed
@@ -114,16 +124,45 @@ and an implementation later.
 
 ## 5. Tier A architecture (the thing to build)
 
+### 5.0 Advanced mode is opt-in (a button, not a default)
+
+The existing flat pipeline **stays exactly as it is** and remains the
+default experience — instant start, ~3MB of models. Everything in Tier A
+lives behind an explicit **"Enhance (3D)" button**:
+
+- Nothing from this plan downloads or initializes until the user clicks it.
+  The ~25–50MB depth model (and matting model, when the upload flow needs
+  it) load only then, with a visible download-progress indicator and a
+  one-line size warning on the button itself (e.g. "Enhance (3D) · ~30MB
+  one-time download").
+- Once downloaded, models are cached (Cache API) and the preference persists
+  (localStorage), so returning users who opted in get advanced mode without
+  re-downloading — but it must remain a visible toggle they can switch off,
+  and switching off returns to the flat pipeline immediately (no reload).
+- If WebGPU is unavailable, the button either downgrades to photo-mode-only
+  advanced (Wasm) or disables with an explanatory tooltip — feature-detect
+  first, never let the user download 50MB into a pipeline that can't run it.
+- Architecturally: one `renderMode: 'simple' | 'advanced'` flag in config,
+  checked at the compositor entry point and the worker model-loading path.
+  The simple path must never grow a dependency on any advanced-mode module
+  (keep them in separate chunks so Vite code-splits them out of the initial
+  bundle).
+
 ### 5.1 New garment asset schema (v2) — superset of today's
 
 ```jsonc
 {
   "id": "user-upload-abc123",
   "category": "kurti",
-  "image": "/garments/....png",        // RGBA, background removed
-  "anchors": { ... },                   // unchanged 6-anchor set
+  "image": "/garments/....png",        // RGBA, background removed (front view)
+  "anchors": { ... },                   // unchanged 6-anchor set (front view)
   "depthMap": "/garments/....depth.png",   // NEW: grayscale, garment-relative depth
   "normalMap": "/garments/....normal.png", // NEW: derived from depthMap offline/at-upload
+  "back": {                             // NEW, OPTIONAL: back view of the garment
+    "image": "/garments/....back.png",
+    "anchors": { ... },                 // 6-anchor set annotated on the back image
+    "depthMap": "...", "normalMap": "..."  // optional, same as front
+  },
   "meta": { ... }
 }
 ```
@@ -132,7 +171,13 @@ and an implementation later.
   working (renderer falls back to today's flat composite). Generate them for
   catalog garments with a one-off Node script OR lazily in-browser on first
   selection, then cache (IndexedDB/Cache API).
-- Lehenga-choli two-piece entries: each piece gets its own depth/normal pair.
+- `back` is **optional and per-asset**: the back view can only be shown for
+  garments whose photo set actually includes a back-side image (product
+  owner decision). No back image → no back rendering, ever — never
+  mirror/hallucinate the front as a fake back (prints, necklines, and
+  closures differ front-to-back and a mirrored front reads as a bug).
+- Lehenga-choli two-piece entries: each piece gets its own depth/normal pair,
+  and its own optional `back` piece.
 - Keep validation in `src/garments/schema.ts` style: additive, discriminated.
 
 ### 5.2 User garment upload pipeline (all in-browser, Web Worker)
@@ -148,6 +193,10 @@ user photo of garment
       extrema — same geometry the annotate tool encodes), then let the user
       drag-adjust the 6 points (reuse tools/annotate.html logic as a React
       component)
+  → OPTIONAL: "add back side?" step — user uploads a second photo of the
+      garment's back; it runs through the same matting/depth/anchor flow
+      and is stored as the asset's `back` piece. Skippable; most users
+      will have only a front photo and that must stay a first-class asset.
   → save garment asset v2 to IndexedDB, appears in the picker
 ```
 
@@ -187,12 +236,25 @@ Applied in this order, each independently demoable:
    (Lambert + slight ambient) and *multiply out* its baked-in flat lighting.
    Also darken garment edges where body curvature turns away (screen-space
    AO approximation from person depth).
-3. **Orientation-aware warp**: pre-rotate the garment quad by torso yaw
-   (foreshorten horizontally around the spine axis, weight by depth map so
-   the near side scales up) before the existing TPS solves residual fit.
-   Beyond ~40° yaw, fade the garment out and show a "turn to face the
-   camera" hint instead of rendering garbage — single-view assets
-   fundamentally can't show their side/back; be honest about it.
+3. **Orientation-aware warp + view selection**: pre-rotate the garment quad
+   by torso yaw (foreshorten horizontally around the spine axis, weight by
+   depth map so the near side scales up) before the existing TPS solves
+   residual fit. Which *view* renders is a pure function of yaw and what
+   the asset provides:
+
+   | Torso yaw (|θ| from frontal) | Asset has back | Asset front-only |
+   |---|---|---|
+   | 0–40° (facing camera) | front view | front view |
+   | 40–140° (profile band) | fade out + "turn to face/away" hint | fade out + hint |
+   | 140–180° (facing away) | **back view** | fade out + hint |
+
+   Back-facing detection signal: BlazePose landmark z-order flips
+   (left/right shoulder swap in x while nose/eye visibility scores drop) —
+   robust and cheap; don't rely on yaw math alone near 180°. Anchor mapping
+   for the back view mirrors L/R keypoint assignment (the person's left
+   shoulder anchors the back image's *right*-side anchor). The profile band
+   fades regardless of assets — flat views (front or back) fundamentally
+   can't show a garment's side; be honest about it.
 4. **Drape-line synthesis (stretch goal)**: use garment depth valleys
    (wrinkle lines) to anisotropically weight the TPS grid so wrinkles bend
    along body curvature instead of shearing rigidly.
@@ -233,12 +295,19 @@ existing WebGPU→Wasm fallback).
 
 ## 7. Build phases (Tier A)
 
-### Phase A1 — Depth infrastructure
-- Add transformers.js (or onnxruntime-web) to the worker; load DA-V2-small
-  lazily; run on photo + garment image; visualize depth as a debug overlay
-  toggle (like mask/skeleton).
-- **Done when:** depth maps render as overlay for person photos and garment
-  images on all 5 test photos, WebGPU + Wasm both verified.
+### Phase A1 — Advanced-mode gate + depth infrastructure
+- Build the "Enhance (3D)" button and `renderMode` flag FIRST (§5.0):
+  code-split chunk, download progress UI, Cache API caching, localStorage
+  persistence, WebGPU feature-detect, instant switch-off. The simple app's
+  initial bundle and startup must be byte-for-byte unaffected.
+- Add transformers.js (or onnxruntime-web) in the advanced chunk; load
+  DA-V2-small only after the button is clicked; run on photo + garment
+  image; visualize depth as a debug overlay toggle (like mask/skeleton).
+- **Done when:** simple mode ships unchanged (verify initial-bundle size
+  before/after); clicking the button downloads with progress, then depth
+  maps render as overlay for person photos and garment images on all 5 test
+  photos; WebGPU + Wasm both verified; toggling off restores the flat
+  pipeline without reload.
 
 ### Phase A2 — Depth-tested occlusion
 - Replace arm-capsule occlusion with per-pixel depth compare (soft edge).
@@ -251,18 +320,25 @@ existing WebGPU→Wasm fallback).
 - **Done when:** side-lit test photo shows garment shaded from the same side;
   A/B toggle (flat vs shaded) demonstrates the difference for the demo.
 
-### Phase A4 — User garment upload
+### Phase A4 — User garment upload (front, optional back)
 - In-browser matting (RMBG), auto-anchor suggestion, drag-adjust anchor UI,
-  IndexedDB persistence, picker integration.
+  IndexedDB persistence, picker integration; optional "add back side" step
+  running the same flow into the asset's `back` piece.
 - **Done when:** a phone photo of a shirt on a bed becomes a working try-on
-  garment in <60s without leaving the browser.
+  garment in <60s without leaving the browser; adding a back photo makes the
+  asset back-capable, skipping it leaves a working front-only asset.
 
-### Phase A5 — Orientation-aware warp + live-mode depth throttling
+### Phase A5 — Orientation-aware warp, view selection + live-mode depth throttling
 - Torso yaw from BlazePose z (or interim: shoulder-width-ratio heuristic);
-  pre-rotation before TPS; live-mode 5fps depth with temporal reuse;
-  >40° fade-out with user hint.
+  pre-rotation before TPS; live-mode 5fps depth with temporal reuse; the
+  yaw→view policy from §5.4.3 (front / fade+hint / back-if-provided), with
+  back-facing detection from landmark L/R flip + face-visibility drop and
+  mirrored anchor assignment for the back view.
 - **Done when:** slow torso rotation in live mode foreshortens the garment
-  plausibly to ±40° and degrades gracefully beyond.
+  plausibly to ±40°; turning fully around shows the back view for a
+  back-capable asset (test with one catalog garment given a real back
+  photo) and the fade+hint for front-only assets; the profile band never
+  renders a smeared garment.
 
 Phases A1–A3 are pure additive rendering work with the existing two models;
 A4 introduces one new model (matting); A5 may swap the pose model. Each phase
@@ -270,14 +346,18 @@ is independently demoable (portfolio requirement from CLAUDE.md).
 
 ## 8. Risks / honest limitations
 
-- **Single-view ceiling:** no amount of depth trickery shows a garment's back
-  or true side. Tier A is "2.5D" — convincing to ±40° of frontal. Set that
-  expectation in the UI; don't chase it in code.
+- **Flat-view ceiling:** front (and, when provided, back) photos still can't
+  show a garment's true side — the 40–140° profile band fades out by design.
+  Tier A is "2.5D": convincing near frontal, honest everywhere else. Never
+  synthesize a back by mirroring the front. Set the expectation in the UI;
+  don't chase profile views in code.
 - **Depth model on garments:** DA-V2 is trained on scenes, not product shots;
   garment depth maps will be plausible-relative, not metric. That's fine —
   only *relative* depth (wrinkles, drape direction) is used.
-- **Model weight budget:** +25–50MB is a real download for a demo site;
-  lazy-load and cache, and keep the flat pipeline as the instant-start path.
+- **Model weight budget:** +25–50MB is a real download for a demo site —
+  which is exactly why advanced mode is opt-in behind a button (§5.0). The
+  flat pipeline is the instant-start default; the download happens once,
+  with progress shown, only for users who ask for it.
 - **Live-mode frame budget:** three models (pose+segment+depth) at 15fps is
   optimistic on mid-range hardware even with WebGPU; the 5fps-depth
   interleave in §5.5 is load-bearing, not optional.
