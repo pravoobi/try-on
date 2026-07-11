@@ -9,25 +9,32 @@ import { config } from './config';
 import type { Garment } from './garments/schema';
 import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
+import { useLiveDepth } from './hooks/useLiveDepth';
 import { useLiveTryOn } from './hooks/useLiveTryOn';
 import { usePipeline } from './hooks/usePipeline';
+import { useTorsoOrientation } from './hooks/useTorsoOrientation';
 import { useUserGarments } from './hooks/useUserGarments';
 import { useWebcam } from './hooks/useWebcam';
+import { mirrorAnchorsLR } from './pipeline/anchorMapping';
 import type { TryOnStatus } from './pipeline/compositor';
 import { depthToNormalMap } from './pipeline/normalMap';
+import { foreshortenFactor, selectGarmentView } from './pipeline/orientation';
 import type { Accelerator, PipelineResult } from './pipeline/types';
 
 /** The advanced-mode normal map(s) for the currently-selected garment
  * (Phase A3) — mirrors LoadedGarmentImages' single/lehenga-choli shape,
- * since a lehenga-choli's two pieces each need their own normal map. */
+ * since a lehenga-choli's two pieces each need their own normal map. A
+ * single-piece garment's optional back photo (Phase A4) gets its own
+ * normal map too, used when the live-mode back view is active (Phase A5). */
 type GarmentNormals =
-  | { kind: 'single'; normal: OffscreenCanvas }
+  | { kind: 'single'; normal: OffscreenCanvas; backNormal: OffscreenCanvas | null }
   | { kind: 'lehenga-choli'; choliNormal: OffscreenCanvas; lehengaNormal: OffscreenCanvas };
 
 /** The loaded ImageBitmap(s) for the currently-selected garment — one for a
- * single-piece garment, two for a lehenga-choli (choli + lehenga skirt). */
+ * single-piece garment (plus its optional back photo), two for a
+ * lehenga-choli (choli + lehenga skirt). */
 type LoadedGarmentImages =
-  | { kind: 'single'; image: ImageBitmap }
+  | { kind: 'single'; image: ImageBitmap; backImage: ImageBitmap | null }
   | { kind: 'lehenga-choli'; choliImage: ImageBitmap; lehengaImage: ImageBitmap };
 
 async function fetchBitmap(path: string): Promise<ImageBitmap> {
@@ -38,8 +45,10 @@ async function fetchBitmap(path: string): Promise<ImageBitmap> {
 
 function closeGarmentImages(images: LoadedGarmentImages | null): void {
   if (!images) return;
-  if (images.kind === 'single') images.image.close();
-  else {
+  if (images.kind === 'single') {
+    images.image.close();
+    images.backImage?.close();
+  } else {
     images.choliImage.close();
     images.lehengaImage.close();
   }
@@ -80,6 +89,16 @@ export default function App() {
   const [garmentNormals, setGarmentNormals] = useState<GarmentNormals | null>(null);
   const photoDepthRef = useRef<ImageBitmap | null>(null);
   const garmentDepthRef = useRef<ImageBitmap | null>(null);
+
+  // Live-mode orientation (Phase A5, see docs/plan-3d-garment-assets.md
+  // §5.4.3) and throttled depth (§5.5) — both meaningful only while
+  // actually live; each hook no-ops (null) outside of live mode.
+  const liveOrientation = useTorsoOrientation(
+    live.latest?.result.keypoints ?? null,
+    mode === 'live',
+    config.orientation,
+  );
+  const liveDepth = useLiveDepth(advanced, live.latest?.frame ?? null, mode === 'live');
 
   const run = useCallback(
     async (bitmap: ImageBitmap) => {
@@ -158,7 +177,11 @@ export default function App() {
                 choliImage: await fetchBitmap(selectedGarment.choli.image),
                 lehengaImage: await fetchBitmap(selectedGarment.lehenga.image),
               }
-            : { kind: 'single', image: await fetchBitmap(selectedGarment.image) };
+            : {
+                kind: 'single',
+                image: await fetchBitmap(selectedGarment.image),
+                backImage: selectedGarment.back ? await fetchBitmap(selectedGarment.back.image) : null,
+              };
         if (cancelled) {
           closeGarmentImages(next);
           return;
@@ -272,10 +295,24 @@ export default function App() {
             return;
           }
           const normal = depthToNormalMap(depth, garmentImages.image, config.relighting.normalStrength);
+
+          let backNormal: OffscreenCanvas | null = null;
+          if (garmentImages.backImage) {
+            const backCopy = await createImageBitmap(garmentImages.backImage);
+            const backDepth = await advanced.estimateDepth(backCopy);
+            if (cancelled) {
+              depth.close();
+              backDepth.close();
+              return;
+            }
+            backNormal = depthToNormalMap(backDepth, garmentImages.backImage, config.relighting.normalStrength);
+            backDepth.close(); // only needed to derive its normal map above.
+          }
+
           garmentDepthRef.current?.close();
           garmentDepthRef.current = depth;
           setGarmentDepth(depth);
-          setGarmentNormals({ kind: 'single', normal });
+          setGarmentNormals({ kind: 'single', normal, backNormal });
         }
       } catch {
         // Best-effort preview/shading; ignore failures — flat rendering still works.
@@ -303,13 +340,26 @@ export default function App() {
     void loadBitmap(await res.blob());
   };
 
+  // Live-mode front/back/fade decision (Phase A5) — a lehenga-choli never
+  // has a back piece (schema.ts), so it always resolves hasBack=false and
+  // just gets the profile-band fade, never a view swap.
+  const viewSelection = useMemo(() => {
+    if (!selectedGarment) return null;
+    const hasBack = selectedGarment.category !== 'lehenga-choli' && !!selectedGarment.back;
+    return selectGarmentView(liveOrientation, hasBack, config.orientation);
+  }, [selectedGarment, liveOrientation]);
+
   const garmentOverlay = useMemo((): GarmentOverlay | null => {
-    if (!selectedGarment || !garmentImages) return null;
+    if (!selectedGarment || !garmentImages || !viewSelection) return null;
     // Shading is an advanced-mode enhancement (Phase A3): the "shading"
     // checkbox is the A/B toggle demonstrating flat-vs-shaded, so simply
     // omit the normal map(s) when it's off rather than threading a
     // separate flag through the compositor.
     const normals = showShading ? garmentNormals : null;
+    const factor = liveOrientation
+      ? foreshortenFactor(liveOrientation.yawDeg, config.orientation.foreshortenFloor)
+      : 1;
+
     if (selectedGarment.category === 'lehenga-choli' && garmentImages.kind === 'lehenga-choli') {
       return {
         kind: 'lehenga-choli',
@@ -320,22 +370,37 @@ export default function App() {
         skirtLength: selectedGarment.meta.length,
         choliNormal: normals?.kind === 'lehenga-choli' ? normals.choliNormal : null,
         lehengaNormal: normals?.kind === 'lehenga-choli' ? normals.lehengaNormal : null,
+        foreshortenFactor: factor,
+        viewAlpha: viewSelection.alpha,
       };
     }
     if (selectedGarment.category !== 'lehenga-choli' && garmentImages.kind === 'single') {
+      // The back photo's own L/R anchors follow the same image-left/right
+      // convention as the front (pipeline/autoAnchor.ts) — mirror them when
+      // warping onto the body, since the shoulder that anchors the front's
+      // left side anchors the back's right side once viewed from behind
+      // (see anchorMapping.mirrorAnchorsLR).
+      const useBack = viewSelection.useBack && garmentImages.backImage && selectedGarment.back;
+      const image = useBack ? garmentImages.backImage! : garmentImages.image;
+      const anchors = useBack ? mirrorAnchorsLR(selectedGarment.back!.anchors) : selectedGarment.anchors;
+      const normal = useBack
+        ? (normals?.kind === 'single' ? normals.backNormal : null)
+        : (normals?.kind === 'single' ? normals.normal : null);
       return {
         kind: 'single',
-        image: garmentImages.image,
-        anchors: selectedGarment.anchors,
+        image,
+        anchors,
         hemLength: selectedGarment.meta.length,
-        normal: normals?.kind === 'single' ? normals.normal : null,
+        normal,
+        foreshortenFactor: factor,
+        viewAlpha: viewSelection.alpha,
       };
     }
     // Transient mismatch: selectedGarment just changed shape and the async
     // image load for it hasn't landed yet — skip a render rather than pass
     // mismatched data.
     return null;
-  }, [selectedGarment, garmentImages, garmentNormals, showShading]);
+  }, [selectedGarment, garmentImages, garmentNormals, showShading, viewSelection, liveOrientation]);
 
   const displayImage = mode === 'live' ? (live.latest?.frame ?? null) : image;
   const displayResult = mode === 'live' ? (live.latest?.result ?? null) : result;
@@ -431,6 +496,11 @@ export default function App() {
               shading
             </label>
             <button onClick={() => advanced.setEnabled(false)}>turn off</button>
+            {mode === 'live' && liveOrientation && (
+              <span className="hint">
+                yaw ~{Math.round(liveOrientation.yawDeg)}° ({liveOrientation.zone})
+              </span>
+            )}
           </>
         )}
       </div>
@@ -501,6 +571,12 @@ export default function App() {
           torso not confidently detected — garment can't be anchored on this photo/pose.
         </p>
       )}
+      {viewSelection?.hint === 'turn-to-front' && (
+        <p className="hint">turn back toward the camera to see this garment.</p>
+      )}
+      {viewSelection?.hint === 'turn-to-back' && (
+        <p className="hint">keep turning — the back view will appear.</p>
+      )}
 
       <main>
         {displayImage ? (
@@ -511,7 +587,7 @@ export default function App() {
             showSkeleton={showSkeleton}
             garment={garmentOverlay}
             depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
-            personDepthBitmap={mode === 'photo' ? photoDepth : null}
+            personDepthBitmap={mode === 'photo' ? photoDepth : liveDepth.depth}
             onTryOnStatus={setTryOnStatus}
           />
         ) : (

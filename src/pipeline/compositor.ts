@@ -15,7 +15,7 @@
  * order ("treat as two garments... composite both").
  */
 import { config } from '../config';
-import { computeBodyAnchors, computeLehengaSkirtBodyAnchors } from './anchorMapping';
+import { computeBodyAnchors, computeLehengaSkirtBodyAnchors, foreshortenAnchors } from './anchorMapping';
 import { clipToMask, openMaskBelow, renderFeatheredMask } from './maskRender';
 import { applyGarmentShading, estimateLight, type ShadingBBox } from './relight';
 import {
@@ -50,6 +50,16 @@ export interface TryOnInput {
    * as `garmentImage` — when present, the garment is Lambertian-shaded
    * against a light estimated from `frame` before compositing. */
   garmentNormal?: (CanvasImageSource & { width: number; height: number }) | null;
+  /** Live-mode orientation-aware warp (Phase A5, see pipeline/orientation.ts
+   * foreshortenFactor): horizontal squeeze of the body-anchor targets
+   * toward their own centroid, 1 = none. Undefined/1 leaves photo mode
+   * (and any caller that doesn't track orientation) unaffected. */
+  foreshortenFactor?: number;
+  /** Live-mode view fade (Phase A5, see pipeline/orientation.ts
+   * selectGarmentView): overall garment-layer opacity, e.g. faded toward
+   * transparent through the unrenderable profile band. Undefined/1 = fully
+   * opaque, matching today's behavior. */
+  viewAlpha?: number;
 }
 
 export type TryOnStatus = 'ok' | 'pose-not-anchorable';
@@ -67,8 +77,9 @@ export function renderTryOn(ctx: Canvas2DContext, input: TryOnInput): TryOnStatu
   ctx.clearRect(0, 0, w, h);
   ctx.drawImage(frame, 0, 0);
 
-  const bodyAnchors = computeBodyAnchors(keypoints, hemLength);
-  if (!bodyAnchors) return 'pose-not-anchorable';
+  const rawBodyAnchors = computeBodyAnchors(keypoints, hemLength);
+  if (!rawBodyAnchors) return 'pose-not-anchorable';
+  const bodyAnchors = foreshortenAnchors(rawBodyAnchors, input.foreshortenFactor ?? 1);
 
   const srcPoints: Point[] = ANCHOR_NAMES.map((n) => garmentAnchors[n]);
   const dstPoints: Point[] = ANCHOR_NAMES.map((n) => bodyAnchors[n]);
@@ -105,7 +116,10 @@ export function renderTryOn(ctx: Canvas2DContext, input: TryOnInput): TryOnStatu
       ? feathered
       : openMaskBelow(feathered, waistY, skirtLen * 0.2, hemY + skirtLen * 0.03, skirtLen * 0.05);
   const clipped = clipToMask(shadedLayer, w, h, clipMask);
+  ctx.save();
+  ctx.globalAlpha = input.viewAlpha ?? 1;
   ctx.drawImage(clipped, 0, 0);
+  ctx.restore();
 
   if (input.armOcclusion !== false) {
     if (input.personDepth) {
@@ -135,6 +149,10 @@ export interface LehengaCholiTryOnInput {
   /** Advanced-mode normal maps (Phase A3) for each piece, same pixel space/coverage as their respective images. */
   choliNormal?: (CanvasImageSource & { width: number; height: number }) | null;
   lehengaNormal?: (CanvasImageSource & { width: number; height: number }) | null;
+  /** See TryOnInput.foreshortenFactor (Phase A5) — applied to both pieces' body-anchor targets. */
+  foreshortenFactor?: number;
+  /** See TryOnInput.viewAlpha (Phase A5). */
+  viewAlpha?: number;
 }
 
 /**
@@ -150,10 +168,13 @@ export function renderLehengaCholiTryOn(ctx: Canvas2DContext, input: LehengaChol
   ctx.clearRect(0, 0, w, h);
   ctx.drawImage(frame, 0, 0);
 
-  const choliBody = computeBodyAnchors(keypoints, 'hip');
-  if (!choliBody) return 'pose-not-anchorable';
-  const skirtBody = computeLehengaSkirtBodyAnchors(keypoints, skirtLength);
-  if (!skirtBody) return 'pose-not-anchorable';
+  const rawCholiBody = computeBodyAnchors(keypoints, 'hip');
+  if (!rawCholiBody) return 'pose-not-anchorable';
+  const rawSkirtBody = computeLehengaSkirtBodyAnchors(keypoints, skirtLength);
+  if (!rawSkirtBody) return 'pose-not-anchorable';
+  const foreshorten = input.foreshortenFactor ?? 1;
+  const choliBody = foreshortenAnchors(rawCholiBody, foreshorten);
+  const skirtBody = foreshortenAnchors(rawSkirtBody, foreshorten);
 
   const choliSrc: Point[] = ANCHOR_NAMES.map((n) => choliAnchors[n]);
   const choliDst: Point[] = ANCHOR_NAMES.map((n) => choliBody[n]);
@@ -213,7 +234,10 @@ export function renderLehengaCholiTryOn(ctx: Canvas2DContext, input: LehengaChol
     skirtLen * 0.05,
   );
   const clipped = clipToMask(combined, w, h, clipMask);
+  ctx.save();
+  ctx.globalAlpha = input.viewAlpha ?? 1;
   ctx.drawImage(clipped, 0, 0);
+  ctx.restore();
 
   if (input.armOcclusion !== false) {
     if (input.personDepth) {

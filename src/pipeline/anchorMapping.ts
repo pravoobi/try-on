@@ -180,3 +180,47 @@ export function computeLehengaSkirtBodyAnchors(
 
   return { waistL, waistR, hemL, hemR };
 }
+
+const MIRROR_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  ['shoulderL', 'shoulderR'],
+  ['waistL', 'waistR'],
+  ['hemL', 'hemR'],
+];
+
+/**
+ * Swaps L/R-named anchors (Phase A5, see docs/plan-3d-garment-assets.md
+ * §5.4.3) — used when warping a garment's *back* photo onto the body: the
+ * back image's own left/right (image-space, same convention as the front —
+ * see pipeline/autoAnchor.ts) is annotated independently, but the person's
+ * shoulder that anchors the front image's left side anchors the back
+ * image's *right* side once you're looking at them from behind.
+ */
+export function mirrorAnchorsLR<T extends Record<string, Point>>(anchors: T): T {
+  const out = { ...anchors };
+  for (const [a, b] of MIRROR_PAIRS) {
+    if (a in anchors && b in anchors) {
+      (out as Record<string, Point>)[a] = anchors[b];
+      (out as Record<string, Point>)[b] = anchors[a];
+    }
+  }
+  return out;
+}
+
+/**
+ * Horizontally compresses an anchor set toward its own centroid x by
+ * `factor` (1 = no change) — a cheap stand-in for a full 3D pre-rotation,
+ * approximating the foreshortening a torso rotated |yaw| degrees from the
+ * camera would show (Phase A5, see docs/plan-3d-garment-assets.md §5.4.3
+ * and pipeline/orientation.ts's foreshortenFactor). y is untouched — only
+ * yaw (rotation about the vertical spine axis) is modeled, not pitch/roll.
+ */
+export function foreshortenAnchors<T extends Record<string, Point>>(anchors: T, factor: number): T {
+  const points = Object.values(anchors) as Point[];
+  const centerX = points.reduce((sum, p) => sum + p[0], 0) / points.length;
+  const out = { ...anchors } as Record<string, Point>;
+  for (const key of Object.keys(anchors)) {
+    const [x, y] = anchors[key as keyof T] as Point;
+    out[key] = [centerX + (x - centerX) * factor, y];
+  }
+  return out as T;
+}

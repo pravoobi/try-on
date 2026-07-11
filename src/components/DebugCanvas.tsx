@@ -19,6 +19,9 @@ export type GarmentOverlay =
       hemLength: HemLength;
       /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
       normal?: OffscreenCanvas | null;
+      /** Live-mode orientation-aware warp + view fade (Phase A5, see pipeline/orientation.ts). */
+      foreshortenFactor?: number;
+      viewAlpha?: number;
     }
   | {
       kind: 'lehenga-choli';
@@ -29,6 +32,8 @@ export type GarmentOverlay =
       skirtLength: HemLength;
       choliNormal?: OffscreenCanvas | null;
       lehengaNormal?: OffscreenCanvas | null;
+      foreshortenFactor?: number;
+      viewAlpha?: number;
     };
 
 interface Props {
@@ -89,6 +94,8 @@ export function DebugCanvas({
           hemLength: garment.hemLength,
           personDepth: personDepthBitmap,
           garmentNormal: garment.normal,
+          foreshortenFactor: garment.foreshortenFactor,
+          viewAlpha: garment.viewAlpha,
         });
       } else {
         tryOnStatus = renderLehengaCholiTryOn(ctx, {
@@ -103,6 +110,8 @@ export function DebugCanvas({
           personDepth: personDepthBitmap,
           choliNormal: garment.choliNormal,
           lehengaNormal: garment.lehengaNormal,
+          foreshortenFactor: garment.foreshortenFactor,
+          viewAlpha: garment.viewAlpha,
         });
       }
     } else {

@@ -111,4 +111,43 @@ export const config = {
     aoGain: 0.6,
     aoMax: 0.5,
   },
+  /**
+   * Orientation-aware warp + view selection (Phase A5, live mode only — a
+   * single photo has no baseline to compare against, see pipeline/
+   * orientation.ts). MoveNet has no z, so yaw is a 2D-only heuristic (the
+   * plan's own sanctioned interim): shoulder width relative to a running
+   * "most-frontal-observed" calibration, disambiguated near 180° by
+   * nose/eye visibility dropping out.
+   */
+  orientation: {
+    /** |yaw| at/below this = front view (full garment, no fade). */
+    frontMaxYawDeg: 35,
+    /** |yaw| at/above this = back view (only if the asset has a back photo). */
+    backMinYawDeg: 145,
+    /** Average nose/eye keypoint confidence below this = face not visible (the back-facing signal). */
+    faceVisibleThreshold: 0.25,
+    /** Per-tick decay on the running frontal shoulder-width baseline when not actively growing — lets a stale high-water-mark (e.g. leaning in early in the session) relax over time. */
+    calibrationDecay: 0.995,
+    /** Shoulder-keypoint confidence required to attempt orientation estimation at all. */
+    minKeypointScore: 0.3,
+    /** Garment layer opacity floor in the unrenderable profile band — never fully invisible, so the fade reads as "turn", not "vanished". */
+    minViewAlpha: 0.08,
+    /** Degrees of smoothstep ramp on either side of the front/back thresholds. */
+    fadeRampDeg: 20,
+    /** Floor on the horizontal foreshorten scale factor — never collapse the garment to a sliver, which would degenerate the TPS warp. */
+    foreshortenFloor: 0.22,
+  },
+  /**
+   * Throttled live-mode person depth (Phase A5, see
+   * docs/plan-3d-garment-assets.md §5.5): depth inference is too slow to run
+   * every pose-tick even on WebGPU (~100-300ms, A1 notes), so it runs on its
+   * own slower timer against a downscaled frame and the last result is
+   * reused between ticks. WebGPU only — on the wasm fallback, depth is
+   * ~30s/frame, so live mode simply never requests it (falls back to
+   * today's arm-capsule occlusion / unshaded rendering).
+   */
+  liveDepth: {
+    fps: 5,
+    maxDim: 256,
+  },
 } as const;
