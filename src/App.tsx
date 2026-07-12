@@ -440,13 +440,14 @@ export default function App() {
       )}
 
       <div className="controls">
-        <label>
-          mode{' '}
-          <select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
-            <option value="photo">photo</option>
-            <option value="live">live webcam</option>
-          </select>
-        </label>
+        <div className="segmented" role="group" aria-label="mode">
+          <button className={mode === 'photo' ? 'selected' : ''} onClick={() => setMode('photo')}>
+            photo
+          </button>
+          <button className={mode === 'live' ? 'selected' : ''} onClick={() => setMode('live')}>
+            live webcam
+          </button>
+        </div>
         <label>
           <input type="checkbox" checked={showMask} onChange={(e) => setShowMask(e.target.checked)} />
           mask
