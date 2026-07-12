@@ -94,6 +94,11 @@ button:disabled {
   cursor: default;
 }
 
+main {
+  display: flex;
+  justify-content: center;
+}
+
 .debug-canvas {
   /* Purely a display-size cap: the canvas's actual pixel resolution (and
      so the cost of every per-pixel pass — warp, mask, occlusion, shading)
