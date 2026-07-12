@@ -1,270 +1,58 @@
 [
   {
-    "id": "kurti-teal-01",
+    "id": "dress-navy-floral-01",
+    "category": "dress",
+    "image": "/garments/dress-navy-floral-01.png",
+    "anchors": {
+      "shoulderL": [129, 159],
+      "shoulderR": [495, 159],
+      "waistL": [206, 319],
+      "waistR": [389, 319],
+      "hemL": [124.7, 1141],
+      "hemR": [508.9, 1141]
+    },
+    "meta": { "sleeves": "half", "length": "ankle" }
+  },
+  {
+    "id": "dress-green-floral-01",
+    "category": "dress",
+    "image": "/garments/dress-green-floral-01.png",
+    "anchors": {
+      "shoulderL": [81, 40],
+      "shoulderR": [339, 40],
+      "waistL": [120, 283],
+      "waistR": [298, 283],
+      "hemL": [76.7, 704],
+      "hemR": [344.2, 704]
+    },
+    "meta": { "sleeves": "half", "length": "knee" }
+  },
+  {
+    "id": "kurti-cream-embroidered-01",
     "category": "kurti",
-    "image": "/garments/kurti-teal-01.png",
+    "image": "/garments/kurti-cream-embroidered-01.png",
     "anchors": {
-      "shoulderL": [
-        135,
-        60
-      ],
-      "shoulderR": [
-        325,
-        60
-      ],
-      "waistL": [
-        150,
-        310
-      ],
-      "waistR": [
-        310,
-        310
-      ],
-      "hemL": [
-        120,
-        560
-      ],
-      "hemR": [
-        340,
-        560
-      ]
+      "shoulderL": [173, 90],
+      "shoulderR": [616, 90],
+      "waistL": [194, 692],
+      "waistR": [596, 692],
+      "hemL": [172.6, 1090],
+      "hemR": [613.1, 1090]
     },
-    "meta": {
-      "sleeves": "half",
-      "length": "hip"
-    }
+    "meta": { "sleeves": "full", "length": "knee" }
   },
   {
-    "id": "kurti-mustard-02",
-    "category": "kurti",
-    "image": "/garments/kurti-mustard-02.png",
-    "anchors": {
-      "shoulderL": [
-        140,
-        55
-      ],
-      "shoulderR": [
-        320,
-        55
-      ],
-      "waistL": [
-        142,
-        320
-      ],
-      "waistR": [
-        318,
-        320
-      ],
-      "hemL": [
-        65,
-        720
-      ],
-      "hemR": [
-        395,
-        720
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "dress-coral-01",
+    "id": "dress-magenta-wrap-01",
     "category": "dress",
-    "image": "/garments/dress-coral-01.png",
+    "image": "/garments/dress-magenta-wrap-01.png",
     "anchors": {
-      "shoulderL": [
-        152,
-        55
-      ],
-      "shoulderR": [
-        328,
-        55
-      ],
-      "waistL": [
-        172,
-        300
-      ],
-      "waistR": [
-        308,
-        300
-      ],
-      "hemL": [
-        65,
-        740
-      ],
-      "hemR": [
-        415,
-        740
-      ]
+      "shoulderL": [109, 90],
+      "shoulderR": [444, 90],
+      "waistL": [170, 334],
+      "waistR": [384, 334],
+      "hemL": [115.4, 1094],
+      "hemR": [449.4, 1094]
     },
-    "meta": {
-      "sleeves": "half",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "dress-navy-02",
-    "category": "dress",
-    "image": "/garments/dress-navy-02.png",
-    "anchors": {
-      "shoulderL": [
-        150,
-        55
-      ],
-      "shoulderR": [
-        330,
-        55
-      ],
-      "waistL": [
-        162,
-        290
-      ],
-      "waistR": [
-        318,
-        290
-      ],
-      "hemL": [
-        90,
-        900
-      ],
-      "hemR": [
-        390,
-        900
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "lehenga-choli-maroon-gold-01",
-    "category": "lehenga-choli",
-    "choli": {
-      "image": "/garments/lehenga-choli-maroon-gold-01-choli.png",
-      "anchors": {
-        "shoulderL": [
-          130,
-          55
-        ],
-        "shoulderR": [
-          310,
-          55
-        ],
-        "waistL": [
-          145,
-          200
-        ],
-        "waistR": [
-          295,
-          200
-        ],
-        "hemL": [
-          142,
-          340
-        ],
-        "hemR": [
-          298,
-          340
-        ]
-      }
-    },
-    "lehenga": {
-      "image": "/garments/lehenga-choli-maroon-gold-01-lehenga.png",
-      "anchors": {
-        "waistL": [
-          265,
-          40
-        ],
-        "waistR": [
-          435,
-          40
-        ],
-        "hemL": [
-          30,
-          860
-        ],
-        "hemR": [
-          670,
-          860
-        ]
-      }
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "dress-navy-sailor-01",
-    "category": "dress",
-    "image": "/garments/dress-navy-sailor-01.png",
-    "anchors": {
-      "shoulderL": [
-        661.1,
-        -10.1
-      ],
-      "shoulderR": [
-        369.5,
-        -10.1
-      ],
-      "waistL": [
-        651.6,
-        314.7
-      ],
-      "waistR": [
-        345.7,
-        314.7
-      ],
-      "hemL": [
-        699,
-        1023.6
-      ],
-      "hemR": [
-        286.5,
-        1023.6
-      ]
-    },
-    "meta": {
-      "sleeves": "full",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "top-cowlneck-sweater-01",
-    "category": "top",
-    "image": "/garments/top-cowlneck-sweater-01.png",
-    "anchors": {
-      "shoulderL": [
-        708.7,
-        72
-      ],
-      "shoulderR": [
-        268.7,
-        72
-      ],
-      "waistL": [
-        680.7,
-        330
-      ],
-      "waistR": [
-        286.7,
-        330
-      ],
-      "hemL": [
-        574.7,
-        640
-      ],
-      "hemR": [
-        354.7,
-        640
-      ]
-    },
-    "meta": {
-      "sleeves": "full",
-      "length": "hip"
-    }
+    "meta": { "sleeves": "half", "length": "ankle" }
   }
 ]

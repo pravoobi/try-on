@@ -9,8 +9,8 @@
  * on a straight-cut shape.
  *
  * L/R here means left/right side of the *image*, matching the convention
- * already used throughout src/garments/catalog.json (e.g. kurti-teal-01's
- * shoulderL=[135,...] sits left of shoulderR=[325,...]) — not an
+ * used throughout src/garments/catalog.json (e.g. dress-navy-floral-01's
+ * shoulderL=[131,...] sits left of shoulderR=[498,...]) — not an
  * anatomical "wearer's own left". Matching the existing convention keeps
  * auto-suggested anchors behaving identically to hand-annotated ones.
  *
