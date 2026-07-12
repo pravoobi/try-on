@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How it works — Virtual Try-On</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background: #111318;
+    color: #e5e7eb;
+    line-height: 1.6;
+  }
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 4rem;
+  }
+  a { color: #60a5fa; }
+  h1 {
+    font-size: 1.4rem;
+    margin: 0 0 0.25rem;
+  }
+  .back {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    color: #9ca3af;
+    text-decoration: none;
+  }
+  .back:hover { color: #60a5fa; }
+  h2 {
+    font-size: 1.05rem;
+    margin: 2.25rem 0 0.6rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #262b36;
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; }
+  p { color: #cbd5e1; }
+  .lede {
+    font-size: 1rem;
+    color: #e5e7eb;
+  }
+  code {
+    background: #1f2430;
+    border: 1px solid #374151;
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.9em;
+  }
+  pre {
+    background: #1a1e27;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.85rem;
+    color: #cbd5e1;
+  }
+  ul { padding-left: 1.2rem; color: #cbd5e1; }
+  li { margin-bottom: 0.4rem; }
+  .badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    border: 1px solid #374151;
+    border-radius: 999px;
+    padding: 0.15rem 0.6rem;
+    margin: 0 0.35rem 0.35rem 0;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #262b36;
+    font-size: 0.85rem;
+    color: #6b7280;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <a class="back" href="./">← Back to Virtual Try-On</a>
+  <h1>How this works</h1>
+  <p class="lede">
+    Everything you see in the app — segmentation, pose detection, the garment
+    warp, and (if you turn it on) depth estimation and relighting — runs as
+    machine learning inference <strong>inside your browser tab</strong>. There
+    is no backend for any of it: no photo or video frame is ever sent
+    anywhere. You could disconnect from the internet after the page and its
+    models finish loading and the try-on would keep working.
+  </p>
+
+  <h2>Why that's true, not just a claim</h2>
+  <p>
+    The models are downloaded once (and cached by the browser, see below),
+    then run entirely on your device via
+    <a href="https://ai.google.dev/edge/litert/web" target="_blank" rel="noopener noreferrer">LiteRT.js</a>
+    and <a href="https://github.com/huggingface/transformers.js" target="_blank" rel="noopener noreferrer">transformers.js</a>,
+    both accelerated by <strong>WebGPU</strong> when your browser supports it
+    (falling back to a Wasm/CPU path otherwise — you can toggle between the
+    two yourself with the WebGPU / CPU switch). All of it happens in a Web
+    Worker, off the main thread, so the page stays responsive while it
+    infers.
+  </p>
+  <p>
+    This is a static site with no server-side code at all — it's hosted on
+    GitHub Pages, which only serves files. There's nowhere for your data to
+    go even if the app wanted to send it somewhere.
+  </p>
+
+  <h2>The pipeline</h2>
+  <pre>webcam/photo ──► [Web Worker: on-device models]
+                   ├─ person segmentation ──► body mask ──────┐
+                   └─ pose estimation ──► 17 keypoints ─► warp ┤
+                                                               ▼
+main thread ◄──────────────────── compositor (canvas 2D)</pre>
+  <ul>
+    <li><strong>Segmentation</strong> finds which pixels are you, so the garment can be clipped to your silhouette and your arms/hair can occlude the fabric correctly.</li>
+    <li><strong>Pose estimation</strong> finds your shoulders, waist, and hips (17 body keypoints), which is what the garment gets anchored to.</li>
+    <li><strong>Thin-plate-spline warp</strong> stretches the garment's own photo onto those anchor points — this is plain geometry/math, not a model.</li>
+    <li><strong>Compositor</strong> layers the warped garment over your photo/frame, masked to your silhouette.</li>
+  </ul>
+
+  <h2>Simple mode vs. "Enhance (3D)"</h2>
+  <p>
+    The app starts in a lightweight default mode: two small models
+    (segmentation + pose), a few megabytes total, so it loads fast. Clicking
+    <strong>Enhance (3D)</strong> is an explicit opt-in that downloads a
+    larger (~30&nbsp;MB) monocular depth-estimation model and unlocks:
+  </p>
+  <ul>
+    <li><strong>Depth-tested occlusion</strong> — arms, hair, and held objects occlude the garment per-pixel, using real estimated depth instead of a simplified heuristic.</li>
+    <li><strong>Relighting</strong> — the garment is shaded against a light direction estimated from your own photo, instead of keeping its original product-photo lighting baked in.</li>
+    <li><strong>Orientation-aware warp (live webcam)</strong> — as you turn, the garment foreshortens, and if you've given it a back photo, turning all the way around shows the back.</li>
+  </ul>
+  <p>
+    Nothing in "Enhance (3D)" downloads or runs until you click the button.
+    Turning it off returns to the simple pipeline immediately, no reload
+    needed.
+  </p>
+
+  <h2>Uploading your own garment</h2>
+  <p>
+    "Upload your own garment" also runs a model — background removal — fully
+    on-device, the same way. A photo of a garment on a bed or hanger gets its
+    background stripped, cropped to the garment's own silhouette, and gets
+    auto-suggested anchor points you can drag to adjust. The result is saved
+    in your browser's local storage (IndexedDB) — again, never uploaded
+    anywhere.
+  </p>
+
+  <h2>Model caching</h2>
+  <p>
+    The one-time model downloads are cached by the browser (the standard
+    Cache Storage API), keyed to this site's origin. Return later and the
+    models load from that cache instead of downloading again — you'll notice
+    "Enhance (3D)" reaching "ready" in a second or two on a repeat visit
+    instead of waiting on a fresh download.
+  </p>
+
+  <h2>What this is</h2>
+  <p>
+    A portfolio project demonstrating on-device ML architecture in the
+    browser: a custom Web Worker protocol, a hand-rolled thin-plate-spline
+    solver, a canvas compositor, and an opt-in "advanced mode" layering
+    depth estimation and relighting on top — all without a server.
+  </p>
+  <div>
+    <span class="badge">React + TypeScript</span>
+    <span class="badge">Vite</span>
+    <span class="badge">LiteRT.js</span>
+    <span class="badge">transformers.js</span>
+    <span class="badge">WebGPU</span>
+    <span class="badge">Canvas 2D</span>
+  </div>
+
+  <footer>
+    <a href="https://github.com/pravoobi/try-on" target="_blank" rel="noopener noreferrer">View source on GitHub</a>
+    · <a href="./">Back to the app</a>
+  </footer>
+</div>
+</body>
+</html>

@@ -424,6 +424,13 @@ export default function App() {
       <div className="top-bar">
         <header>
           <h1>Virtual Try-On</h1>
+          <p className="tagline">
+            Runs entirely in your browser — no server, no uploads. Your photo and webcam video never
+            leave this device.{' '}
+            <a href={assetUrl('/about.html')} target="_blank" rel="noopener noreferrer">
+              How it works →
+            </a>
+          </p>
           <p className="status">
             {pipeline.status === 'loading' && 'Loading models…'}
             {pipeline.status === 'error' && <span className="error">init failed: {pipeline.error}</span>}
