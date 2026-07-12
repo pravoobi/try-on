@@ -421,28 +421,30 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>Virtual Try-On</h1>
-        <p className="status">
-          {pipeline.status === 'loading' && 'Loading models…'}
-          {pipeline.status === 'error' && <span className="error">init failed: {pipeline.error}</span>}
-          {pipeline.status === 'ready' && `init ${Math.round(pipeline.initMs ?? 0)} ms`}
-        </p>
-      </header>
+      <div className="top-bar">
+        <header>
+          <h1>Virtual Try-On</h1>
+          <p className="status">
+            {pipeline.status === 'loading' && 'Loading models…'}
+            {pipeline.status === 'error' && <span className="error">init failed: {pipeline.error}</span>}
+            {pipeline.status === 'ready' && `init ${Math.round(pipeline.initMs ?? 0)} ms`}
+          </p>
+        </header>
 
-      {pipeline.status === 'ready' && (
-        <PerfStats
-          accelerator={accelerator}
-          onAcceleratorChange={setAccelerator}
-          backend={pipeline.backend}
-          fps={mode === 'live' && live.latest ? live.fps : null}
-          timings={
-            mode === 'photo'
-              ? (result?.timings ?? null)
-              : (live.latest?.result.timings ?? null)
-          }
-        />
-      )}
+        {pipeline.status === 'ready' && (
+          <PerfStats
+            accelerator={accelerator}
+            onAcceleratorChange={setAccelerator}
+            backend={pipeline.backend}
+            fps={mode === 'live' && live.latest ? live.fps : null}
+            timings={
+              mode === 'photo'
+                ? (result?.timings ?? null)
+                : (live.latest?.result.timings ?? null)
+            }
+          />
+        )}
+      </div>
 
       <div className="layout">
         <div className="main-column">
