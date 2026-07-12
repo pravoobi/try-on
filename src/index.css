@@ -2,28 +2,46 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family: system-ui, sans-serif;
   background: #111318;
   color: #e5e7eb;
+  /* The app is a fixed-height shell (see .app) — .main-column and
+     .garment-sidebar-list are the only two things that scroll, each
+     independently. No page-level scrollbar, so there's never a second,
+     redundant scrollbar alongside the garment list's own one. */
+  overflow: hidden;
 }
 
 .app {
   max-width: 1400px;
+  height: 100%;
   margin: 0 auto;
   padding: 1rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .layout {
   display: flex;
   gap: 1.25rem;
-  align-items: flex-start;
+  flex: 1;
+  min-height: 0; /* required for flex children to scroll instead of growing past the viewport */
 }
 
 .main-column {
   flex: 1;
   min-width: 0; /* let the canvas shrink instead of overflowing the flex row */
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.5rem;
 }
 
 .garment-sidebar {
@@ -31,14 +49,44 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  position: sticky;
-  top: 1rem;
+  min-height: 0;
 }
 
 .garment-sidebar-list {
-  max-height: 75vh;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 0.25rem;
+}
+
+/* Dark, minimal scrollbar for the two scrollable panels above, instead of
+   the browser's default (usually light) scrollbar clashing with the
+   dark background. */
+.main-column,
+.garment-sidebar-list {
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+.main-column::-webkit-scrollbar,
+.garment-sidebar-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-column::-webkit-scrollbar-track,
+.garment-sidebar-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.main-column::-webkit-scrollbar-thumb,
+.garment-sidebar-list::-webkit-scrollbar-thumb {
+  background-color: #374151;
+  border-radius: 8px;
+}
+
+.main-column::-webkit-scrollbar-thumb:hover,
+.garment-sidebar-list::-webkit-scrollbar-thumb:hover {
+  background-color: #4b5563;
 }
 
 .top-bar {
