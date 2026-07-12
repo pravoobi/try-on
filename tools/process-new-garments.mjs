@@ -1,15 +1,24 @@
 /**
- * One-off utility: turns raw product photos in public/garments/new/ (flat
- * gray/white studio backgrounds, fully opaque) into catalog-ready garment
- * PNGs — background removal (port of tools/remove-background.html's
- * corner-sampled bilinear key, so results match what that tool would
- * produce, done Node-side to avoid Chrome's per-origin download-limit
- * gotcha for a multi-file batch — see docs memory), crop to the alpha
- * bounding box (+ small margin, matches pipeline/autoAnchor.ts's
+ * One-off utility: turns raw product photos in tools/raw-garments/ (flat
+ * gray/white or vignetted studio backgrounds, fully opaque) into
+ * catalog-ready garment PNGs in public/garments/ — background removal via
+ * a flood-fill color-distance key (an IDW background-color grid sampled
+ * from the border, then only pixels *connected* to the border through
+ * other background-like pixels are made transparent — see
+ * floodFillBackgroundMask's own doc comment for why plain per-pixel
+ * distance punches holes through light-colored print motifs), crop to the
+ * alpha bounding box (+ small margin, matches pipeline/autoAnchor.ts's
  * cropToAlphaBBox), and auto-suggested anchors (port of pipeline/
  * autoAnchor.ts's suggestAnchors — same heuristic, see that file for the
- * reasoning). Anchors are a STARTING POINT ONLY (CLAUDE.md: "anchor
- * quality dominates output quality") — verify visually before trusting.
+ * reasoning). Raw sources live outside public/ so they never ship in the
+ * built site — only the processed, cropped PNGs do.
+ *
+ * Anchors are a STARTING POINT ONLY (CLAUDE.md: "anchor quality dominates
+ * output quality") — verify visually before trusting, especially the
+ * shoulder anchor on puff-sleeve garments: the "widest row in the top
+ * band" heuristic can land on the sleeve bulge instead of the neckline,
+ * which stretches a chunk of empty image up over the wearer's face when
+ * warped. Hand-correct shoulderL/R to the true neckline row if so.
  *
  * Usage: node tools/process-new-garments.mjs
  */
@@ -19,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const srcDir = path.join(root, 'public', 'garments', 'new');
+const srcDir = path.join(root, 'tools', 'raw-garments');
 const outDir = path.join(root, 'public', 'garments');
 
 // --- Minimal PNG decoder (8-bit RGBA only — matches crop-garment-top.mjs) ---
