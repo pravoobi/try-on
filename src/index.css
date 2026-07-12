@@ -59,7 +59,7 @@ h1 {
   margin: 0 0 0.35rem;
   color: #9ca3af;
   font-size: 0.85rem;
-  max-width: 46ch;
+  white-space: nowrap;
 }
 
 .tagline a {
