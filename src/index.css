@@ -166,6 +166,48 @@ body {
   flex: 0 0 auto;
 }
 
+/* Garment upload flow (see components/GarmentUpload.tsx) — a centered
+   dialog over a dimmed backdrop, rather than an inline panel in the
+   sidebar. Closes only on skip/save completing or the close button
+   (handled in GarmentUpload.tsx), not on a backdrop click — the anchor
+   drag-adjust step makes an accidental stray-click dismissal costly. */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: #111318;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 1.25rem;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background-color: #374151;
+  border-radius: 8px;
+}
+
 .top-bar {
   display: flex;
   justify-content: space-between;

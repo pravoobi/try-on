@@ -192,10 +192,11 @@ export function GarmentUpload({ onGarmentAdded }: Props) {
   }
 
   return (
-    <div className="garment-upload">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Upload your own garment">
+      <div className="modal-content garment-upload">
       <div className="controls">
         <span className="hint">upload your own garment</span>
-        <button onClick={close}>cancel</button>
+        <button onClick={close}>✕ close</button>
       </div>
 
       {matting.status === 'downloading' && (
@@ -329,6 +330,7 @@ export function GarmentUpload({ onGarmentAdded }: Props) {
       )}
 
       {step.kind === 'saving' && <p className="hint">saving…</p>}
+      </div>
     </div>
   );
 }
