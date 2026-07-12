@@ -5,8 +5,7 @@ dist/
 CLAUDE.md
 .claude/
 
-# fetched binaries — re-fetch with `npm run fetch-models` / `npm run fetch-test-photos`
+# fetched binaries — re-fetch with `npm run fetch-models`
 public/models/*.tflite
-public/test-photos/
 # synced from node_modules by tools/copy-litert-wasm.mjs
 public/litert-wasm/

@@ -384,7 +384,7 @@ export default function App() {
     setRunError(null);
     const res = await fetch(assetUrl(`/test-photos/${name}`));
     if (!res.ok) {
-      setRunError(`could not load ${name} — run \`npm run fetch-test-photos\` first`);
+      setRunError(`could not load ${name} — missing from public/test-photos/ (try \`npm run fetch-test-photos -- --force\`)`);
       return;
     }
     void loadBitmap(await res.blob());
