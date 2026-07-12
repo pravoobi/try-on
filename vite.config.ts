@@ -13,6 +13,18 @@ export default defineConfig(({ mode }) => ({
   // `vite preview`, 'development' for `vite`/`vite dev`.
   base: mode === 'production' ? '/try-on/' : '/',
   plugins: [react()],
+  server: {
+    // Fixed, not just "preferred": Cache Storage (where the advanced-mode
+    // depth model is cached, see docs/plan-3d-garment-assets.md §5.0) and
+    // localStorage/IndexedDB are all scoped per-origin, and origin
+    // includes the port. If a stale dev-server process is left running on
+    // 5173, Vite's default behavior is to silently bind the next free port
+    // instead — a different origin, so every "cached" download looks
+    // fresh again. Fail loudly instead: closing the other process is a
+    // five-second fix, silently losing the cache every session isn't.
+    port: 5173,
+    strictPort: true,
+  },
   worker: {
     format: 'es',
   },

@@ -7,8 +7,19 @@
  * worker entry point its own chunk, so the ~50MB model + the transformers.js
  * runtime never touch the simple app's default bundle or startup.
  */
-import { pipeline, RawImage } from '@huggingface/transformers';
+import { env, pipeline, RawImage } from '@huggingface/transformers';
 import type { DepthAccelerator, DepthWorkerRequest, DepthWorkerResponse } from '../pipeline/depthTypes';
+
+// Explicit, not just relying on the library default: the whole point of
+// gating this ~30-50MB model behind an opt-in button (§5.0) is a ONE-TIME
+// download — persisted in the browser's Cache Storage, keyed by the model
+// URL, so a returning session reuses it instead of re-fetching. (If it
+// ever looks like it's re-downloading every session, the usual cause is
+// external: Cache Storage is scoped per origin, and a stale dev-server
+// process left bound to a lower port pushes a new one onto a different
+// port — a different origin, so the cache looks empty again. See
+// vite.config.ts's strictPort.)
+env.useBrowserCache = true;
 
 const post = self.postMessage.bind(self) as (
   msg: DepthWorkerResponse,

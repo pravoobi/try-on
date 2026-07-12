@@ -6,12 +6,17 @@
  * lazily on first use of "upload your own garment", separately from
  * advanced mode's depth model. Vite gives it its own chunk.
  */
-import { pipeline, RawImage } from '@huggingface/transformers';
+import { env, pipeline, RawImage } from '@huggingface/transformers';
 import type {
   MattingAccelerator,
   MattingWorkerRequest,
   MattingWorkerResponse,
 } from '../pipeline/mattingTypes';
+
+// See depth.worker.ts's identical line for why this is explicit rather
+// than left to the library default: a one-time model download only stays
+// one-time if the browser cache actually persists across sessions.
+env.useBrowserCache = true;
 
 const post = self.postMessage.bind(self) as (
   msg: MattingWorkerResponse,

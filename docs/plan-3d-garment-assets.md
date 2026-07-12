@@ -370,6 +370,30 @@ usage):**
   fake-webcam subject: yaw pinned at 0° across 10+ seconds where it
   previously wandered.
 
+**Model caching (user report: "the 30MB file re-downloads every time"):**
+transformers.js already caches downloaded model weights via the browser's
+Cache Storage API by default (`env.useBrowserCache`) — no code bug. The
+real cause was environmental and self-inflicted during this build: Cache
+Storage (like localStorage/IndexedDB) is scoped per *origin*, and origin
+includes the port. Across this project's dev sessions, several `npm run
+dev` instances were left running simultaneously; a fresh `npm run dev`
+silently binds the next free port when the default is taken, which is a
+*different origin* with an empty cache — so every session that happened to
+land on a new port re-downloaded the model from scratch, indistinguishable
+from the cache not working at all. Fixed by killing the stray processes,
+pinning `vite.config.ts`'s dev server to a fixed port with
+`strictPort: true` (fails loudly on a port conflict instead of silently
+drifting to a new origin), and making `env.useBrowserCache = true` explicit
+in both depth.worker.ts and matting.worker.ts (defensive — protects against
+a future library version flipping its default, and documents the intent
+inline instead of leaving it implicit). Verified directly: inspected
+`caches.open('transformers-cache')` contents and confirmed the `.onnx`
+weight files persist across a killed-and-restarted dev server process on
+the same port, and that re-enabling advanced mode after a page reload
+reaches "ready" in ~2s with no download-progress phase. In production
+(GitHub Pages), origin is fixed by the domain, so this failure mode is a
+local-dev-only footgun — but worth knowing if it ever resurfaces.
+
 ## 1. Problem statement (from the product owner)
 
 The current 2D TPS warp of flat garment PNGs onto pose keypoints produces
