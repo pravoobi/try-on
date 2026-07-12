@@ -15,6 +15,9 @@ const CONFIG: OrientationConfig = {
   backMinYawDeg: 145,
   faceVisibleThreshold: 0.25,
   calibrationDecay: 0.995,
+  calibrationGrowthAlpha: 0.25,
+  yawSmoothingAlpha: 0.3,
+  foreshortenDeadbandDeg: 12,
   minKeypointScore: 0.3,
   minViewAlpha: 0.08,
   fadeRampDeg: 20,
@@ -63,15 +66,27 @@ function backKeypoints(shoulderWidth: number, faceVisible: boolean): Keypoint[] 
 }
 
 describe('updateOrientationCalibration', () => {
-  it('grows instantly to a wider confidently-frontal width', () => {
-    const cal1 = updateOrientationCalibration(INITIAL_ORIENTATION_CALIBRATION, frontalKeypoints(200), CONFIG);
-    expect(cal1.maxShoulderWidth).toBeCloseTo(200, 5);
-    const cal2 = updateOrientationCalibration(cal1, frontalKeypoints(240), CONFIG);
-    expect(cal2.maxShoulderWidth).toBeCloseTo(240, 5);
+  it('approaches a wider confidently-frontal width via EMA — a single glitchy frame cannot poison the baseline', () => {
+    let cal = updateOrientationCalibration(INITIAL_ORIENTATION_CALIBRATION, frontalKeypoints(200), CONFIG);
+    expect(cal.maxShoulderWidth).toBeCloseTo(200 * CONFIG.calibrationGrowthAlpha, 5);
+    for (let i = 0; i < 40; i++) {
+      cal = updateOrientationCalibration(cal, frontalKeypoints(200), CONFIG);
+    }
+    expect(cal.maxShoulderWidth).toBeGreaterThan(195);
+
+    // One glitchy double-width frame moves a converged baseline by only
+    // the growth fraction — yaw is measured against this baseline, so a
+    // jump-to-max here would half-fade the garment for minutes.
+    const converged = cal.maxShoulderWidth;
+    const spiked = updateOrientationCalibration(cal, frontalKeypoints(400), CONFIG);
+    expect(spiked.maxShoulderWidth).toBeCloseTo(
+      converged + (400 - converged) * CONFIG.calibrationGrowthAlpha,
+      5,
+    );
   });
 
   it('does not shrink the baseline when a narrower frontal width is observed', () => {
-    const cal1 = updateOrientationCalibration(INITIAL_ORIENTATION_CALIBRATION, frontalKeypoints(200), CONFIG);
+    const cal1: { maxShoulderWidth: number } = { maxShoulderWidth: 200 };
     const cal2 = updateOrientationCalibration(cal1, frontalKeypoints(150), CONFIG);
     // Decays slightly rather than snapping down to the narrower observation.
     expect(cal2.maxShoulderWidth).toBeLessThan(cal1.maxShoulderWidth);
@@ -79,23 +94,20 @@ describe('updateOrientationCalibration', () => {
   });
 
   it('decays (does not grow) when the face is not visible, even at a wide width', () => {
-    const cal1 = updateOrientationCalibration(INITIAL_ORIENTATION_CALIBRATION, frontalKeypoints(200), CONFIG);
-    const cal2 = updateOrientationCalibration(cal1, turnedKeypoints(300, false), CONFIG);
+    const cal2 = updateOrientationCalibration({ maxShoulderWidth: 200 }, turnedKeypoints(300, false), CONFIG);
     expect(cal2.maxShoulderWidth).toBeCloseTo(200 * CONFIG.calibrationDecay, 5);
   });
 
   it('decays (does not grow) on a back-facing frame, even with confident face keypoints and a wide width', () => {
-    const cal1 = updateOrientationCalibration(INITIAL_ORIENTATION_CALIBRATION, frontalKeypoints(200), CONFIG);
     // MoveNet can hallucinate confident nose/eyes on the back of a head —
     // the flipped shoulder order must veto calibration growth regardless.
-    const cal2 = updateOrientationCalibration(cal1, backKeypoints(300, true), CONFIG);
+    const cal2 = updateOrientationCalibration({ maxShoulderWidth: 200 }, backKeypoints(300, true), CONFIG);
     expect(cal2.maxShoulderWidth).toBeCloseTo(200 * CONFIG.calibrationDecay, 5);
   });
 
   it('decays when shoulders are not confidently visible', () => {
-    const cal1 = updateOrientationCalibration(INITIAL_ORIENTATION_CALIBRATION, frontalKeypoints(200), CONFIG);
-    const lowConfidence = [kp('left_shoulder', 100, 100, 0.1), kp('right_shoulder', 300, 100, 0.1)];
-    const cal2 = updateOrientationCalibration(cal1, lowConfidence, CONFIG);
+    const lowConfidence = [kp('left_shoulder', 300, 100, 0.1), kp('right_shoulder', 100, 100, 0.1)];
+    const cal2 = updateOrientationCalibration({ maxShoulderWidth: 200 }, lowConfidence, CONFIG);
     expect(cal2.maxShoulderWidth).toBeCloseTo(200 * CONFIG.calibrationDecay, 5);
   });
 });
@@ -219,5 +231,11 @@ describe('foreshortenFactor', () => {
 
   it('never drops below the floor even well past 90', () => {
     expect(foreshortenFactor(95, 0.5)).toBeCloseTo(0.5, 5);
+  });
+
+  it('applies no foreshortening within the deadband of front or back', () => {
+    expect(foreshortenFactor(10, 0.22, 12)).toBeCloseTo(1, 5);
+    expect(foreshortenFactor(172, 0.22, 12)).toBeCloseTo(1, 5);
+    expect(foreshortenFactor(30, 0.22, 12)).toBeLessThan(1);
   });
 });

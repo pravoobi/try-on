@@ -11,8 +11,8 @@ export const config = {
   litertWasmPath: '/litert-wasm/',
   /** Keypoints below this score are not drawn / not used for anchoring. */
   minKeypointScore: 0.3,
-  /** Exponential smoothing factor for live keypoints (Phase 3): s = α·new + (1−α)·prev. */
-  smoothingAlpha: 0.4,
+  /** Exponential smoothing factor for live keypoints (Phase 3): s = α·new + (1−α)·prev. Lower = steadier; keypoint noise propagates into anchor targets, hem stance cover, and the yaw estimate, all of which read as the garment "shaking" on a still subject. */
+  smoothingAlpha: 0.3,
   /** Live inference throttle target (Phase 3). */
   targetFps: 15,
   /**
@@ -76,6 +76,13 @@ export const config = {
      * anchorMapping.ts computeFlaredHem's stance cover).
      */
     stanceCoverMargin: 0.25,
+    /**
+     * Confidence band (above minKeypointScore) over which a leg joint's
+     * stance-cover constraint fades in. A hard threshold makes the hem
+     * width JUMP whenever a knee/ankle score hovers around the cutoff —
+     * visible as the skirt silhouette popping frame to frame in live mode.
+     */
+    stanceScoreSoftBand: 0.15,
   },
   /** TPS warp evaluation grid (see pipeline/warp.ts). */
   warpGrid: { cols: 16, rows: 24 },
@@ -171,6 +178,28 @@ export const config = {
     faceVisibleThreshold: 0.25,
     /** Per-tick decay on the running frontal shoulder-width baseline when not actively growing — lets a stale high-water-mark (e.g. leaning in early in the session) relax over time. */
     calibrationDecay: 0.995,
+    /**
+     * How fast the baseline approaches a wider confidently-frontal
+     * observation (EMA, not a jump): a single glitchy wide frame must not
+     * become the baseline — yaw is measured against it, so a poisoned
+     * baseline reads a normal stance as "turned", permanently half-fading
+     * the garment (seen in the field as the dress looking transparent).
+     */
+    calibrationGrowthAlpha: 0.25,
+    /**
+     * EMA smoothing on the yaw estimate itself (hooks/useTorsoOrientation).
+     * acos(width/baseline) has unbounded slope near frontal, so a couple
+     * of pixels of shoulder-keypoint noise swings raw yaw by tens of
+     * degrees — enough to flicker across the fade threshold and read as
+     * the garment blinking on a perfectly still subject.
+     */
+    yawSmoothingAlpha: 0.3,
+    /**
+     * No foreshortening within this many degrees of dead-front/dead-back —
+     * residual yaw noise otherwise makes the garment's width "breathe"
+     * frame to frame while the subject stands still.
+     */
+    foreshortenDeadbandDeg: 12,
     /** Shoulder-keypoint confidence required to attempt orientation estimation at all. */
     minKeypointScore: 0.3,
     /** Garment layer opacity floor in the unrenderable profile band — never fully invisible, so the fade reads as "turn", not "vanished". */

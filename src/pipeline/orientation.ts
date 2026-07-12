@@ -39,6 +39,9 @@ export interface OrientationConfig {
   backMinYawDeg: number;
   faceVisibleThreshold: number;
   calibrationDecay: number;
+  calibrationGrowthAlpha: number;
+  yawSmoothingAlpha: number;
+  foreshortenDeadbandDeg: number;
   minKeypointScore: number;
   minViewAlpha: number;
   fadeRampDeg: number;
@@ -65,12 +68,15 @@ function faceVisibility(map: Map<KeypointName, Keypoint>): number {
 }
 
 /**
- * Grows the calibrated "frontal" shoulder-width baseline instantly whenever
- * a wider, confidently-frontal width is observed; otherwise decays it
- * slowly (config.calibrationDecay per call) so a stale high-water-mark
- * (e.g. the user leaned toward the camera early in the session) relaxes
- * rather than permanently reading every later, normal-distance frame as
- * "turned away".
+ * Moves the calibrated "frontal" shoulder-width baseline toward a wider,
+ * confidently-frontal observation via EMA (config.calibrationGrowthAlpha
+ * per frame) — NOT a jump to the new maximum: yaw is measured against
+ * this baseline, so letting one glitchy wide frame become the baseline
+ * reads every subsequent normal frame as "turned", which half-fades the
+ * garment for minutes (the decay is deliberately slow). When not growing,
+ * it decays slowly (config.calibrationDecay per call) so a stale
+ * high-water-mark (e.g. the user leaned toward the camera early in the
+ * session) relaxes rather than persisting forever.
  */
 export function updateOrientationCalibration(
   cal: OrientationCalibration,
@@ -91,7 +97,8 @@ export function updateOrientationCalibration(
   // but calibrating on it would be calibrating on the wrong hemisphere.
   const facingCamera = faceScore >= config.faceVisibleThreshold && ls.x >= rs.x;
   if (facingCamera && width > cal.maxShoulderWidth) {
-    return { maxShoulderWidth: width };
+    const a = config.calibrationGrowthAlpha;
+    return { maxShoulderWidth: a * width + (1 - a) * cal.maxShoulderWidth };
   }
   return { maxShoulderWidth: cal.maxShoulderWidth * config.calibrationDecay };
 }
@@ -126,10 +133,12 @@ export function estimateTorsoOrientation(
   const backFacing = shouldersFlipped || faceScore < config.faceVisibleThreshold;
   const yawDeg = backFacing ? 180 - widthYaw : widthYaw;
 
-  const zone: TorsoOrientation['zone'] =
-    yawDeg <= config.frontMaxYawDeg ? 'front' : yawDeg >= config.backMinYawDeg ? 'back' : 'profile';
+  return { yawDeg, zone: zoneForYaw(yawDeg, config), confidence: Math.min(ls.score, rs.score) };
+}
 
-  return { yawDeg, zone, confidence: Math.min(ls.score, rs.score) };
+/** Categorical zone for a |yaw| — exposed separately so callers that smooth yaw over time (hooks/useTorsoOrientation.ts) can re-derive the zone from the smoothed value. */
+export function zoneForYaw(yawDeg: number, config: OrientationConfig): TorsoOrientation['zone'] {
+  return yawDeg <= config.frontMaxYawDeg ? 'front' : yawDeg >= config.backMinYawDeg ? 'back' : 'profile';
 }
 
 export interface ViewSelection {
@@ -188,10 +197,13 @@ export function selectGarmentView(
  * Horizontal foreshorten scale factor for a given |yaw| (see
  * anchorMapping.foreshortenAnchors) — 1 at front or back (frontal to
  * either camera), shrinking toward `floor` at the deep-profile midpoint,
- * symmetric around 90°.
+ * symmetric around 90°. `deadbandDeg` of yaw nearest front/back is
+ * ignored entirely: residual yaw noise on a still subject otherwise makes
+ * the garment's width visibly "breathe" frame to frame.
  */
-export function foreshortenFactor(yawDeg: number, floor: number): number {
+export function foreshortenFactor(yawDeg: number, floor: number, deadbandDeg = 0): number {
   const symmetric = Math.min(yawDeg, 180 - yawDeg); // 0 at front or back, 90 at deep profile
-  const raw = Math.cos((symmetric * Math.PI) / 180);
+  const effective = Math.max(0, symmetric - deadbandDeg);
+  const raw = Math.cos((effective * Math.PI) / 180);
   return Math.max(floor, raw);
 }

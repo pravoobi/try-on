@@ -357,7 +357,11 @@ export default function App() {
     // separate flag through the compositor.
     const normals = showShading ? garmentNormals : null;
     const factor = liveOrientation
-      ? foreshortenFactor(liveOrientation.yawDeg, config.orientation.foreshortenFloor)
+      ? foreshortenFactor(
+          liveOrientation.yawDeg,
+          config.orientation.foreshortenFloor,
+          config.orientation.foreshortenDeadbandDeg,
+        )
       : 1;
 
     if (selectedGarment.category === 'lehenga-choli' && garmentImages.kind === 'lehenga-choli') {

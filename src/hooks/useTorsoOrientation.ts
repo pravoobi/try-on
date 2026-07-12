@@ -3,6 +3,7 @@ import {
   estimateTorsoOrientation,
   INITIAL_ORIENTATION_CALIBRATION,
   updateOrientationCalibration,
+  zoneForYaw,
   type OrientationConfig,
   type TorsoOrientation,
 } from '../pipeline/orientation';
@@ -32,20 +33,37 @@ export function useTorsoOrientation(
   orientationConfig: OrientationConfig,
 ): TorsoOrientation | null {
   const calRef = useRef(INITIAL_ORIENTATION_CALIBRATION);
+  const yawRef = useRef<number | null>(null);
   const wasActiveRef = useRef(false);
 
   return useMemo(() => {
     if (!active) {
       wasActiveRef.current = false;
       calRef.current = INITIAL_ORIENTATION_CALIBRATION;
+      yawRef.current = null;
       return null;
     }
     if (!wasActiveRef.current) {
       calRef.current = INITIAL_ORIENTATION_CALIBRATION;
+      yawRef.current = null;
       wasActiveRef.current = true;
     }
     if (!keypoints) return null;
     calRef.current = updateOrientationCalibration(calRef.current, keypoints, orientationConfig);
-    return estimateTorsoOrientation(keypoints, calRef.current, orientationConfig);
+    const raw = estimateTorsoOrientation(keypoints, calRef.current, orientationConfig);
+    if (!raw) {
+      yawRef.current = null;
+      return null;
+    }
+    // Smooth yaw across frames before anything downstream consumes it:
+    // acos(width/baseline) has unbounded slope near frontal, so raw yaw
+    // swings tens of degrees on a couple pixels of shoulder noise —
+    // flickering the view fade (garment "blinks") and breathing the
+    // foreshorten width on a perfectly still subject. The zone is
+    // re-derived from the smoothed value so it can't disagree with it.
+    const a = orientationConfig.yawSmoothingAlpha;
+    const yawDeg = yawRef.current === null ? raw.yawDeg : a * raw.yawDeg + (1 - a) * yawRef.current;
+    yawRef.current = yawDeg;
+    return { yawDeg, zone: zoneForYaw(yawDeg, orientationConfig), confidence: raw.confidence };
   }, [keypoints, active, orientationConfig]);
 }

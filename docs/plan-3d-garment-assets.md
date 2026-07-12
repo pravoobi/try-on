@@ -346,6 +346,29 @@ usage):**
   front/back photos cannot render a garment's side; the 40-140° profile
   band fades with a turn hint *by design* (§5.4.3, §8). A true side view
   needs 3D garment geometry — that's Tier B (§6), not a Tier A bug.
+- **Garment "blinking"/"shaking"/semi-transparency on a still subject
+  (second round of real-webcam feedback):** all one root cause — the raw
+  orientation estimate is noisy and everything downstream amplified it.
+  acos(width/baseline) has *unbounded slope near frontal*, so a couple of
+  pixels of shoulder-keypoint noise swings raw yaw by tens of degrees:
+  enough to flicker across the fade threshold (garment blinks) and to make
+  the foreshorten width "breathe" per frame (garment shakes). Worse, the
+  calibration baseline was a running MAX, so one glitchy wide frame
+  poisoned it for minutes (decay 0.995/frame), holding measured yaw
+  permanently above the fade threshold — the "dress looks transparent"
+  report was the view fade misfiring at rest, not a compositing bug. Fixes,
+  all tunable in config: yaw is EMA-smoothed across frames
+  (`orientation.yawSmoothingAlpha`, in useTorsoOrientation, with the zone
+  re-derived from the smoothed value), calibration growth is an EMA rather
+  than jump-to-max (`orientation.calibrationGrowthAlpha`), foreshortening
+  ignores a deadband near dead-front/dead-back
+  (`orientation.foreshortenDeadbandDeg`), the stance-cover hem constraints
+  fade in over a confidence band instead of hard-toggling at the keypoint
+  threshold (`anchors.stanceScoreSoftBand` — a knee/ankle score hovering at
+  the cutoff popped the skirt silhouette per frame), and base keypoint
+  smoothing tightened (smoothingAlpha 0.4 → 0.3). Verified with a static
+  fake-webcam subject: yaw pinned at 0° across 10+ seconds where it
+  previously wandered.
 
 ## 1. Problem statement (from the product owner)
 

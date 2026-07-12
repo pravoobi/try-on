@@ -168,22 +168,29 @@ function computeFlaredHem(
     const hemYMid = (ly + ry) / 2;
     const span = Math.max(1, hemYMid - topY);
     const margin = hipHalfWidth * config.anchors.stanceCoverMargin;
+    const flareHalfWidth = halfWidth;
 
-    const constraints: Array<readonly [number, number]> = [
-      [Math.abs(ctx.hipL[0] - centerX), (ctx.hipL[1] + ctx.hipR[1]) / 2],
-      [Math.abs(ctx.hipR[0] - centerX), (ctx.hipL[1] + ctx.hipR[1]) / 2],
+    // [need, yAt, weight] — weight fades a joint's constraint in over a
+    // confidence band above the threshold instead of a hard on/off: a
+    // knee/ankle score hovering at the cutoff would otherwise pop the hem
+    // width (and the whole skirt silhouette) frame to frame in live mode.
+    const constraints: Array<readonly [number, number, number]> = [
+      [Math.abs(ctx.hipL[0] - centerX), (ctx.hipL[1] + ctx.hipR[1]) / 2, 1],
+      [Math.abs(ctx.hipR[0] - centerX), (ctx.hipL[1] + ctx.hipR[1]) / 2, 1],
     ];
     for (const name of stanceJoints) {
       const kp = findKeypoint(keypoints, name);
       if (kp && kp.score >= config.minKeypointScore) {
-        constraints.push([Math.abs(kp.x - centerX) + margin, kp.y]);
+        const weight = Math.min(1, (kp.score - config.minKeypointScore) / config.anchors.stanceScoreSoftBand);
+        constraints.push([Math.abs(kp.x - centerX) + margin, kp.y, weight]);
       }
     }
 
-    for (const [need, yAt] of constraints) {
+    for (const [need, yAt, weight] of constraints) {
       const t = Math.min(1, (yAt - topY) / span);
       if (t <= 0.1) continue; // at/above the top anchor — not the hem edge's problem
-      halfWidth = Math.max(halfWidth, topHalfWidth + (need - topHalfWidth) / t);
+      const required = topHalfWidth + (need - topHalfWidth) / t;
+      halfWidth = Math.max(halfWidth, flareHalfWidth + (required - flareHalfWidth) * weight);
     }
     // Keypoint glitches (an ankle detected way off-body) shouldn't produce
     // a tent — cap the stance-driven widening.
