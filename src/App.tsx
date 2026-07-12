@@ -100,6 +100,56 @@ export default function App() {
   );
   const liveDepth = useLiveDepth(advanced, live.latest?.frame ?? null, mode === 'live');
 
+  // Fullscreen live view: a button-triggered overlay (cam feed + garment
+  // strip + close), only meaningful in live mode. `isFullscreen` is the
+  // source of truth for our own overlay visibility; it's kept in sync with
+  // the REAL browser fullscreen state (so ESC / the browser's own UI also
+  // exits correctly) via the fullscreenchange listener below, but doesn't
+  // strictly require requestFullscreen to have succeeded — if the
+  // Fullscreen API is unavailable or denied, the overlay still covers the
+  // viewport via fixed positioning, just without hiding browser chrome.
+  const fullscreenRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement) setIsFullscreen(false);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    if (mode !== 'live' && isFullscreen) {
+      if (document.fullscreenElement) void document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, [mode, isFullscreen]);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Escape already exits real browser fullscreen on its own; this only
+      // does the extra work of also closing our overlay in the CSS-only
+      // fallback path, where there's no native fullscreen to exit.
+      if (e.key === 'Escape' && !document.fullscreenElement) setIsFullscreen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isFullscreen]);
+
+  const enterFullscreen = () => {
+    setIsFullscreen(true);
+    fullscreenRef.current?.requestFullscreen?.().catch(() => {
+      // Fallback: the CSS-only overlay above still works without native fullscreen.
+    });
+  };
+
+  const exitFullscreenMode = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    setIsFullscreen(false);
+  };
+
   const run = useCallback(
     async (bitmap: ImageBitmap) => {
       setProcessing(true);
@@ -533,6 +583,7 @@ export default function App() {
           {mode === 'photo' && (
             <div className="controls">
               <label>
+              Your Photo 
                 <input type="file" accept="image/*" onChange={onFile} disabled={pipeline.status !== 'ready'} />
               </label>
               <span className="hint">test photos:</span>
@@ -550,6 +601,7 @@ export default function App() {
 
           {mode === 'live' && (
             <div className="controls">
+              <button onClick={enterFullscreen}>⛶ fullscreen</button>
               <span className="hint">
                 {webcam.status === 'requesting' && 'requesting camera access…'}
                 {webcam.status === 'ready' &&
@@ -580,26 +632,31 @@ export default function App() {
             <p className="hint">keep turning — the back view will appear.</p>
           )}
 
-          <main>
-            {displayImage ? (
-              <DebugCanvas
-                image={displayImage}
-                result={displayResult}
-                showMask={showMask}
-                showSkeleton={showSkeleton}
-                garment={garmentOverlay}
-                depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
-                personDepthBitmap={mode === 'photo' ? photoDepth : liveDepth.depth}
-                onTryOnStatus={setTryOnStatus}
-              />
-            ) : (
-              <p className="hint">
-                {mode === 'photo'
-                  ? 'Upload a photo or pick a test photo to run the pipeline.'
-                  : 'Waiting for camera…'}
-              </p>
-            )}
-          </main>
+          {/* Skipped while the fullscreen overlay owns the view below — it's
+              fully covered anyway, and rendering both would composite every
+              live frame twice for nothing. */}
+          {!isFullscreen && (
+            <main>
+              {displayImage ? (
+                <DebugCanvas
+                  image={displayImage}
+                  result={displayResult}
+                  showMask={showMask}
+                  showSkeleton={showSkeleton}
+                  garment={garmentOverlay}
+                  depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
+                  personDepthBitmap={mode === 'photo' ? photoDepth : liveDepth.depth}
+                  onTryOnStatus={setTryOnStatus}
+                />
+              ) : (
+                <p className="hint">
+                  {mode === 'photo'
+                    ? 'Upload a photo or pick a test photo to run the pipeline.'
+                    : 'Waiting for camera…'}
+                </p>
+              )}
+            </main>
+          )}
         </div>
 
         <aside className="garment-sidebar">
@@ -628,6 +685,52 @@ export default function App() {
             )}
           </div>
         </aside>
+      </div>
+
+      {/* Always mounted (never conditionally removed) so requestFullscreen
+          has a real DOM node to target the moment the button is clicked;
+          `.active` is what actually makes it visible — see index.css. This
+          also keeps working if the Fullscreen API itself is unavailable or
+          denied, since the fixed positioning alone covers the viewport. */}
+      <div ref={fullscreenRef} className={`fullscreen-view${isFullscreen ? ' active' : ''}`}>
+        {isFullscreen && (
+          <>
+            <button className="fullscreen-close" onClick={exitFullscreenMode}>
+              ✕ close
+            </button>
+            <div className="fullscreen-canvas-wrap">
+              {displayImage ? (
+                <DebugCanvas
+                  image={displayImage}
+                  result={displayResult}
+                  showMask={showMask}
+                  showSkeleton={showSkeleton}
+                  garment={garmentOverlay}
+                  depthBitmap={null}
+                  personDepthBitmap={liveDepth.depth}
+                  onTryOnStatus={setTryOnStatus}
+                />
+              ) : (
+                <p className="hint">Waiting for camera…</p>
+              )}
+              {viewSelection?.hint === 'turn-to-front' && (
+                <p className="hint fullscreen-hint">turn back toward the camera to see this garment.</p>
+              )}
+              {viewSelection?.hint === 'turn-to-back' && (
+                <p className="hint fullscreen-hint">keep turning — the back view will appear.</p>
+              )}
+            </div>
+            <div className="fullscreen-garments">
+              {catalog.status === 'ready' && (
+                <GarmentPicker
+                  garments={allGarments}
+                  selectedId={selectedGarment?.id ?? null}
+                  onSelect={setSelectedGarment}
+                />
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
