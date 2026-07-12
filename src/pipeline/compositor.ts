@@ -352,6 +352,11 @@ function boxBlurRedChannel(data: Uint8ClampedArray, w: number, h: number, radius
  * uses, just with a scalar (depth) target instead of a 2D point — from the
  * person's own measured depth at each body anchor: the torso's actual
  * depth stands in for "roughly where the fabric sits".
+ *
+ * The scan region is bounded below at the hip line (plus a short margin,
+ * config.depthOcclusion.belowHipCutoffFrac) regardless of how far the
+ * garment itself hangs — legs are always under the skirt, never in front
+ * of it, and depth reads a forward leg as an occluder.
  */
 function applyDepthOcclusion(
   ctx: Canvas2DContext,
@@ -362,7 +367,36 @@ function applyDepthOcclusion(
   w: number,
   h: number,
 ): void {
-  const { bx, by, bw, bh } = toPixelBBox(expandedAnchorBBox(bodyAnchors, config.depthOcclusion.bboxMarginFrac, w, h));
+  // The reference "garment surface depth" below needs confidently-placed
+  // torso keypoints, and so does the leg cutoff — gate on them up front.
+  const byName = new Map(keypoints.map((k) => [k.name, k] as const));
+  const shoulderL = byName.get('left_shoulder');
+  const shoulderR = byName.get('right_shoulder');
+  const hipL = byName.get('left_hip');
+  const hipR = byName.get('right_hip');
+  const minScore = config.minKeypointScore;
+  if (
+    !shoulderL || !shoulderR || !hipL || !hipR ||
+    shoulderL.score < minScore || shoulderR.score < minScore ||
+    hipL.score < minScore || hipR.score < minScore
+  ) {
+    return; // torso not confidently visible; skip occlusion this frame.
+  }
+
+  // Legs are always *under* the garment being worn, never in front of it —
+  // but a knee/ankle garment's anchors reach its hem, and monocular depth
+  // routinely reads a forward leg as "closer than the torso" (a real local
+  // reading, not noise the blur below can remove), which carved leg-shaped
+  // holes out of long skirts. Everything that genuinely occludes worn
+  // fabric (arms, hair, held objects) operates at or above hip level, so
+  // the scan simply never descends more than a short margin past the hips.
+  const hipMidY = (hipL.y + hipR.y) / 2;
+  const shoulderMidY = (shoulderL.y + shoulderR.y) / 2;
+  const torsoHeight = Math.abs(hipMidY - shoulderMidY);
+  const legCutoffY = hipMidY + torsoHeight * config.depthOcclusion.belowHipCutoffFrac;
+
+  const scanBox = expandedAnchorBBox(bodyAnchors, config.depthOcclusion.bboxMarginFrac, w, h);
+  const { bx, by, bw, bh } = toPixelBBox({ ...scanBox, maxY: Math.min(scanBox.maxY, legCutoffY) });
   if (bw <= 0 || bh <= 0) return;
 
   const depthCanvas = new OffscreenCanvas(w, h);
@@ -404,19 +438,6 @@ function applyDepthOcclusion(
   // "occlude" a large fraction of the torso. Sampling densely across the
   // torso interior (bilinear grid between the 4 keypoints) and taking the
   // median is robust to that: one bad sample among dozens barely moves it.
-  const byName = new Map(keypoints.map((k) => [k.name, k] as const));
-  const shoulderL = byName.get('left_shoulder');
-  const shoulderR = byName.get('right_shoulder');
-  const hipL = byName.get('left_hip');
-  const hipR = byName.get('right_hip');
-  const minScore = config.minKeypointScore;
-  if (
-    !shoulderL || !shoulderR || !hipL || !hipR ||
-    shoulderL.score < minScore || shoulderR.score < minScore ||
-    hipL.score < minScore || hipR.score < minScore
-  ) {
-    return; // torso not confidently visible; skip occlusion this frame.
-  }
   const torsoSamples: number[] = [];
   const GRID = 5;
   for (let iv = 1; iv < GRID; iv++) {

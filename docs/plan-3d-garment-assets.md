@@ -282,6 +282,30 @@ build time — the browser-ML ecosystem moves fast.
   should still walk the phase's done-when checklist (full turn shows the
   back view for a back-capable asset; no smeared garment mid-turn).
 
+**Post-A5 fix (leg coverage on knee/ankle garments):** long garments showed
+leg-shaped gaps, from two independent causes fixed together. (1) The
+depth-occlusion scan covered the garment's whole anchor bbox — down to the
+ankle hem for a long dress — and monocular depth reads a forward leg as
+"closer than the torso median" (a real local reading the blur can't
+remove), carving a leg-shaped hole out of the skirt; the scan is now
+bottom-clamped just below the hip line
+(`config.depthOcclusion.belowHipCutoffFrac`) since legs are always *under*
+worn fabric while genuine occluders (arms, hair, held objects) operate at
+or above hip level — hands-on-hips still occlude. (2) Hem anchor targets
+were pinned to exactly hip width, so a wide-stance leg poked out beside the
+fabric; hems now get a modest flare (`config.anchors.dressFlare`) plus a
+stance-cover constraint (anchorMapping.computeFlaredHem): the warped fabric
+edge runs near-straight from the garment's top anchor to its hem anchor, so
+each leg joint at height-fraction t along that edge imposes a hem-width
+requirement scaled by 1/t — naively widening the hem to a joint's own x
+still lets the edge cut across the thigh above it (verified empirically:
+the first, naive version left a thigh strip exposed). Hip silhouette points
+are included as constraints so the straight edge clears the whole thigh.
+Verified across photo-01: ankle + knee catalog dresses, the lehenga-choli
+(shares the flare code path — its stance cover uses the skirt waistband as
+the edge top), a hip-length kurti (unchanged), and a user-uploaded
+photographic ankle dress, all with advanced mode on.
+
 ## 1. Problem statement (from the product owner)
 
 The current 2D TPS warp of flat garment PNGs onto pose keypoints produces

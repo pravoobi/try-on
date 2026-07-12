@@ -33,6 +33,13 @@ const HEM_KEYPOINTS: Record<HemLength, readonly [KeypointName, KeypointName] | n
   ankle: ['left_ankle', 'right_ankle'],
 };
 
+/** Leg keypoints a hem of this length hangs over — every joint between the hips and the hem line, since fabric must clear all of them. */
+const STANCE_KEYPOINTS: Record<HemLength, readonly KeypointName[]> = {
+  hip: [],
+  knee: ['left_knee', 'right_knee'],
+  ankle: ['left_knee', 'right_knee', 'left_ankle', 'right_ankle'],
+};
+
 interface TorsoContext {
   shoulderL: Point;
   shoulderR: Point;
@@ -108,9 +115,11 @@ function computeHem(
   hemLength: HemLength,
   ctx: TorsoContext,
 ): [Point, Point] {
-  // Garment hangs from the hip line: only the keypoint's depth (y) is used,
-  // x stays at the hips. Correct for a fitted dress/kurti hem, which follows
-  // the body silhouette rather than flaring outward.
+  // x pinned exactly at the hips — used for the lehenga skirt's waistband,
+  // which must sit at the same hip-line points the choli's hem uses so the
+  // two pieces meet with no gap. Garment hems themselves get a flare
+  // instead (computeFlaredHem): even a "fitted" knee/ankle hem hangs a bit
+  // wider than the hips, or a wide-stance leg pokes out beside the fabric.
   const [ly, ry] = computeHemY(keypoints, hemLength, ctx);
   return [
     [ctx.hipL[0], ly],
@@ -119,22 +128,68 @@ function computeHem(
 }
 
 /**
- * Like computeHem, but flares the hem outward from the hips by
- * config.anchors.skirtFlare[skirtLength] — a lehenga skirt's hem is
- * dramatically wider than its waistband, unlike a fitted dress hem which
- * hangs straight down. Collapsing it to hip-width (as computeHem does)
- * mismatches the garment image's own wide flare badly enough that the TPS
- * warp folds over itself.
+ * Like computeHem, but flares the hem outward from the hips by `flare` (a
+ * multiple of the hip half-width) — a lehenga skirt's hem is dramatically
+ * wider than its waistband (config.anchors.skirtFlare), and even a fitted
+ * knee/ankle dress hangs slightly wider than the hips
+ * (config.anchors.dressFlare), otherwise a wide-stance leg pokes out
+ * beside the fabric. Collapsing a wide garment image's hem to hip-width
+ * mismatches its own flare badly enough that the TPS warp folds over
+ * itself.
  */
 function computeFlaredHem(
   keypoints: readonly Keypoint[],
-  skirtLength: HemLength,
+  hemLength: HemLength,
   ctx: TorsoContext,
+  flare: number,
+  topL: Point,
+  topR: Point,
 ): [Point, Point] {
-  const [ly, ry] = computeHemY(keypoints, skirtLength, ctx);
+  const [ly, ry] = computeHemY(keypoints, hemLength, ctx);
   const centerX = (ctx.hipL[0] + ctx.hipR[0]) / 2;
   const hipHalfWidth = Math.abs(ctx.hipR[0] - ctx.hipL[0]) / 2;
-  const halfWidth = hipHalfWidth * config.anchors.skirtFlare[skirtLength];
+  let halfWidth = hipHalfWidth * flare;
+
+  // The hem also has to clear the wearer's stance: fabric hangs *over* the
+  // legs, so a wide-stance leg must never poke out beside the fabric. The
+  // warped fabric edge runs (near-)straight from the garment's top anchor
+  // on that side (`topL`/`topR` — the waist for a dress, the waistband for
+  // a lehenga skirt) down to the hem anchor, so clearing a leg joint at
+  // height-fraction t along that edge is a constraint on the HEM width
+  // scaled by 1/t — naively widening the hem to the joint's own x still
+  // lets the edge cut across the thigh/knee higher up. The hip silhouette
+  // points anchor the top of each leg, so including them makes the
+  // straight edge clear the whole (straight) thigh, not just the joints
+  // below it.
+  const stanceJoints = STANCE_KEYPOINTS[hemLength];
+  if (stanceJoints.length > 0) {
+    const topY = (topL[1] + topR[1]) / 2;
+    const topHalfWidth = Math.abs(topR[0] - topL[0]) / 2;
+    const hemYMid = (ly + ry) / 2;
+    const span = Math.max(1, hemYMid - topY);
+    const margin = hipHalfWidth * config.anchors.stanceCoverMargin;
+
+    const constraints: Array<readonly [number, number]> = [
+      [Math.abs(ctx.hipL[0] - centerX), (ctx.hipL[1] + ctx.hipR[1]) / 2],
+      [Math.abs(ctx.hipR[0] - centerX), (ctx.hipL[1] + ctx.hipR[1]) / 2],
+    ];
+    for (const name of stanceJoints) {
+      const kp = findKeypoint(keypoints, name);
+      if (kp && kp.score >= config.minKeypointScore) {
+        constraints.push([Math.abs(kp.x - centerX) + margin, kp.y]);
+      }
+    }
+
+    for (const [need, yAt] of constraints) {
+      const t = Math.min(1, (yAt - topY) / span);
+      if (t <= 0.1) continue; // at/above the top anchor — not the hem edge's problem
+      halfWidth = Math.max(halfWidth, topHalfWidth + (need - topHalfWidth) / t);
+    }
+    // Keypoint glitches (an ankle detected way off-body) shouldn't produce
+    // a tent — cap the stance-driven widening.
+    halfWidth = Math.min(halfWidth, hipHalfWidth * 3);
+  }
+
   const sign = Math.sign(ctx.hipL[0] - ctx.hipR[0]) || 1;
   return [
     [centerX + sign * halfWidth, ly],
@@ -157,7 +212,14 @@ export function computeBodyAnchors(
   const waistL: Point = [lerp(ctx.shoulderL[0], ctx.hipL[0], t), lerp(ctx.shoulderL[1], ctx.hipL[1], t)];
   const waistR: Point = [lerp(ctx.shoulderR[0], ctx.hipR[0], t), lerp(ctx.shoulderR[1], ctx.hipR[1], t)];
 
-  const [hemL, hemR] = computeHem(keypoints, hemLength, ctx);
+  const [hemL, hemR] = computeFlaredHem(
+    keypoints,
+    hemLength,
+    ctx,
+    config.anchors.dressFlare[hemLength],
+    waistL,
+    waistR,
+  );
 
   return { shoulderL: ctx.shoulderL, shoulderR: ctx.shoulderR, waistL, waistR, hemL, hemR };
 }
@@ -176,7 +238,14 @@ export function computeLehengaSkirtBodyAnchors(
   if (!ctx) return null;
 
   const [waistL, waistR] = computeHem(keypoints, 'hip', ctx);
-  const [hemL, hemR] = computeFlaredHem(keypoints, skirtLength, ctx);
+  const [hemL, hemR] = computeFlaredHem(
+    keypoints,
+    skirtLength,
+    ctx,
+    config.anchors.skirtFlare[skirtLength],
+    waistL,
+    waistR,
+  );
 
   return { waistL, waistR, hemL, hemR };
 }

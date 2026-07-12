@@ -53,6 +53,21 @@ export const config = {
      * anchorMapping.ts computeFlaredHem).
      */
     skirtFlare: { hip: 1, knee: 1.9, ankle: 2.6 },
+    /**
+     * Single-piece garment hem flare, same units as skirtFlare but far
+     * subtler: a hem pinned to exactly hip width leaves a wide-stance leg
+     * poking out beside the fabric on knee/ankle dresses, while a real
+     * dress hem hangs a bit wider than the hips. Hip-length garments stay
+     * fitted (1) — their hem is at the hips by definition.
+     */
+    dressFlare: { hip: 1, knee: 1.2, ankle: 1.35 },
+    /**
+     * Extra hem width past the outermost leg keypoint, as a fraction of the
+     * (widened) hip half-width — keypoints sit at joint centers, so the
+     * fabric needs to clear the leg's own outer edge too (see
+     * anchorMapping.ts computeFlaredHem's stance cover).
+     */
+    stanceCoverMargin: 0.25,
   },
   /** TPS warp evaluation grid (see pipeline/warp.ts). */
   warpGrid: { cols: 16, rows: 24 },
@@ -83,6 +98,16 @@ export const config = {
     marginGray: 10,
     /** Width, in gray levels, of the soft occlusion edge ramp. */
     softBandGray: 18,
+    /**
+     * The occlusion scan never descends more than this fraction of torso
+     * height below the hip line. Legs are always *under* the garment being
+     * worn, never in front of it, but monocular depth reads a forward leg
+     * as "closer than the torso" — scanning down a knee/ankle garment's
+     * full extent carved leg-shaped holes out of the skirt. Everything
+     * that genuinely occludes worn fabric (arms, hair, held objects)
+     * operates at or above hip level; hands-on-hips stay inside the scan.
+     */
+    belowHipCutoffFrac: 0.2,
   },
   /**
    * Single-light Lambertian relighting (Phase A3, advanced mode only): see
