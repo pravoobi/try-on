@@ -222,7 +222,12 @@ main {
   padding: 0.15rem 0.5rem;
   border: 1px solid #374151;
   border-radius: 6px;
-  min-width: 3.5rem;
+  /* Fixed width, not a min: in live mode fps/segment/pose update every
+     frame, and a value's text width naturally varies ("5.2 ms" vs
+     "123.4 ms") — without a hard width, each tile (and the toggle/backend
+     tiles beside it, since the row is right-aligned) visibly shifts
+     position every frame instead of just the digits changing in place. */
+  width: 5rem;
 }
 
 .stat-label {
@@ -239,6 +244,13 @@ main {
   display: flex;
   align-items: center;
   gap: 0.3rem;
+  /* Same-width digits: proportional fonts otherwise make "1" narrower than
+     "8", so even a fixed-width tile can jitter by a pixel or two as the
+     digits themselves change every frame in live mode. */
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-dot {
