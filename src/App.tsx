@@ -409,8 +409,13 @@ export default function App() {
   const displayImage = mode === 'live' ? (live.latest?.frame ?? null) : image;
   const displayResult = mode === 'live' ? (live.latest?.result ?? null) : result;
 
+  // User-uploaded garments first (most-recently-added on top, so a new
+  // upload doesn't require scrolling to find), catalog garments below.
   const allGarments = useMemo(
-    (): Garment[] => (catalog.status === 'ready' ? [...catalog.garments, ...userGarments.garments] : []),
+    (): Garment[] =>
+      catalog.status === 'ready'
+        ? [...([...userGarments.garments].reverse() as Garment[]), ...catalog.garments]
+        : [],
     [catalog.status, catalog.garments, userGarments.garments],
   );
 
@@ -439,170 +444,178 @@ export default function App() {
         />
       )}
 
-      <div className="controls">
-        <div className="segmented" role="group" aria-label="mode">
-          <button className={mode === 'photo' ? 'selected' : ''} onClick={() => setMode('photo')}>
-            photo
-          </button>
-          <button className={mode === 'live' ? 'selected' : ''} onClick={() => setMode('live')}>
-            live webcam
-          </button>
-        </div>
-        <label>
-          <input type="checkbox" checked={showMask} onChange={(e) => setShowMask(e.target.checked)} />
-          mask
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={showSkeleton}
-            onChange={(e) => setShowSkeleton(e.target.checked)}
-          />
-          skeleton
-        </label>
-      </div>
+      <div className="layout">
+        <div className="main-column">
+          <div className="controls">
+            <div className="segmented" role="group" aria-label="mode">
+              <button className={mode === 'photo' ? 'selected' : ''} onClick={() => setMode('photo')}>
+                photo
+              </button>
+              <button className={mode === 'live' ? 'selected' : ''} onClick={() => setMode('live')}>
+                live webcam
+              </button>
+            </div>
+            <label>
+              <input type="checkbox" checked={showMask} onChange={(e) => setShowMask(e.target.checked)} />
+              mask
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showSkeleton}
+                onChange={(e) => setShowSkeleton(e.target.checked)}
+              />
+              skeleton
+            </label>
+          </div>
 
-      <div className="controls">
-        {advanced.status === 'off' && (
-          <button onClick={() => advanced.setEnabled(true)}>
-            Enhance (3D) · ~30MB one-time download{!advanced.webgpuSupported ? ' · CPU (slower)' : ''}
-          </button>
-        )}
-        {advanced.status === 'downloading' && (
-          <span className="hint">
-            downloading depth model…{' '}
-            {advanced.progress !== null ? `${Math.round(advanced.progress * 100)}%` : ''}
-          </span>
-        )}
-        {advanced.status === 'error' && (
-          <>
-            <span className="error">advanced mode failed: {advanced.error}</span>
-            <button onClick={() => advanced.setEnabled(false)}>dismiss</button>
-          </>
-        )}
-        {advanced.status === 'ready' && (
-          <>
-            <span className="hint">advanced mode ready ({advanced.device})</span>
-            <label>
-              <input
-                type="checkbox"
-                checked={showDepth}
-                disabled={mode !== 'photo'}
-                onChange={(e) => setShowDepth(e.target.checked)}
-              />
-              depth
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={showShading}
-                onChange={(e) => setShowShading(e.target.checked)}
-              />
-              shading
-            </label>
-            <button onClick={() => advanced.setEnabled(false)}>turn off</button>
-            {mode === 'live' && liveOrientation && (
+          <div className="controls">
+            {advanced.status === 'off' && (
+              <button onClick={() => advanced.setEnabled(true)}>
+                Enhance (3D) · ~30MB one-time download{!advanced.webgpuSupported ? ' · CPU (slower)' : ''}
+              </button>
+            )}
+            {advanced.status === 'downloading' && (
               <span className="hint">
-                yaw ~{Math.round(liveOrientation.yawDeg)}° ({liveOrientation.zone})
+                downloading depth model…{' '}
+                {advanced.progress !== null ? `${Math.round(advanced.progress * 100)}%` : ''}
               </span>
             )}
-          </>
-        )}
-      </div>
+            {advanced.status === 'error' && (
+              <>
+                <span className="error">advanced mode failed: {advanced.error}</span>
+                <button onClick={() => advanced.setEnabled(false)}>dismiss</button>
+              </>
+            )}
+            {advanced.status === 'ready' && (
+              <>
+                <span className="hint">advanced mode ready ({advanced.device})</span>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={showDepth}
+                    disabled={mode !== 'photo'}
+                    onChange={(e) => setShowDepth(e.target.checked)}
+                  />
+                  depth
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={showShading}
+                    onChange={(e) => setShowShading(e.target.checked)}
+                  />
+                  shading
+                </label>
+                <button onClick={() => advanced.setEnabled(false)}>turn off</button>
+                {mode === 'live' && liveOrientation && (
+                  <span className="hint">
+                    yaw ~{Math.round(liveOrientation.yawDeg)}° ({liveOrientation.zone})
+                  </span>
+                )}
+              </>
+            )}
+          </div>
 
-      {mode === 'photo' && (
-        <div className="controls">
-          <label>
-            <input type="file" accept="image/*" onChange={onFile} disabled={pipeline.status !== 'ready'} />
-          </label>
-          <span className="hint">test photos:</span>
-          {config.testPhotos.map((name) => (
-            <button
-              key={name}
-              onClick={() => void onTestPhoto(name)}
-              disabled={pipeline.status !== 'ready'}
-            >
-              {name.replace(/\.(jpg|png)$/, '')}
-            </button>
-          ))}
+          {mode === 'photo' && (
+            <div className="controls">
+              <label>
+                <input type="file" accept="image/*" onChange={onFile} disabled={pipeline.status !== 'ready'} />
+              </label>
+              <span className="hint">test photos:</span>
+              {config.testPhotos.map((name) => (
+                <button
+                  key={name}
+                  onClick={() => void onTestPhoto(name)}
+                  disabled={pipeline.status !== 'ready'}
+                >
+                  {name.replace(/\.(jpg|png)$/, '')}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {mode === 'live' && (
+            <div className="controls">
+              <span className="hint">
+                {webcam.status === 'requesting' && 'requesting camera access…'}
+                {webcam.status === 'ready' &&
+                  pipeline.status === 'ready' &&
+                  !live.latest &&
+                  'starting live inference…'}
+                {webcam.status === 'error' && <span className="error">camera error: {webcam.error}</span>}
+              </span>
+            </div>
+          )}
+
+          {userGarments.status === 'error' && (
+            <p className="error">user garment library error: {userGarments.error}</p>
+          )}
+          {runError && <p className="error">{runError}</p>}
+          {live.error && <p className="error">live inference error: {live.error}</p>}
+          {garmentError && <p className="error">garment load failed: {garmentError}</p>}
+          {processing && <p className="hint">running inference…</p>}
+          {tryOnStatus === 'pose-not-anchorable' && (
+            <p className="hint">
+              torso not confidently detected — garment can't be anchored on this photo/pose.
+            </p>
+          )}
+          {viewSelection?.hint === 'turn-to-front' && (
+            <p className="hint">turn back toward the camera to see this garment.</p>
+          )}
+          {viewSelection?.hint === 'turn-to-back' && (
+            <p className="hint">keep turning — the back view will appear.</p>
+          )}
+
+          <main>
+            {displayImage ? (
+              <DebugCanvas
+                image={displayImage}
+                result={displayResult}
+                showMask={showMask}
+                showSkeleton={showSkeleton}
+                garment={garmentOverlay}
+                depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
+                personDepthBitmap={mode === 'photo' ? photoDepth : liveDepth.depth}
+                onTryOnStatus={setTryOnStatus}
+              />
+            ) : (
+              <p className="hint">
+                {mode === 'photo'
+                  ? 'Upload a photo or pick a test photo to run the pipeline.'
+                  : 'Waiting for camera…'}
+              </p>
+            )}
+          </main>
         </div>
-      )}
 
-      {mode === 'live' && (
-        <div className="controls">
-          <span className="hint">
-            {webcam.status === 'requesting' && 'requesting camera access…'}
-            {webcam.status === 'ready' && pipeline.status === 'ready' && !live.latest && 'starting live inference…'}
-            {webcam.status === 'error' && <span className="error">camera error: {webcam.error}</span>}
-          </span>
-        </div>
-      )}
-
-      <div className="controls">
-        <span className="hint">garment:</span>
-        {catalog.status === 'loading' && <span className="hint">loading catalog…</span>}
-        {catalog.status === 'error' && <span className="error">catalog error: {catalog.error}</span>}
-        {catalog.status === 'ready' && (
-          <GarmentPicker
-            garments={allGarments}
-            selectedId={selectedGarment?.id ?? null}
-            onSelect={setSelectedGarment}
+        <aside className="garment-sidebar">
+          <GarmentUpload
+            onGarmentAdded={async (stored) => {
+              const garment = await userGarments.addGarment(stored);
+              setSelectedGarment(garment);
+            }}
           />
-        )}
-        {garmentDepth && (
-          <span className="garment-depth-preview" title="garment depth map">
-            <BitmapCanvas bitmap={garmentDepth} />
-          </span>
-        )}
+
+          <div className="garment-sidebar-list">
+            <span className="hint">garment:</span>
+            {catalog.status === 'loading' && <span className="hint">loading catalog…</span>}
+            {catalog.status === 'error' && <span className="error">catalog error: {catalog.error}</span>}
+            {catalog.status === 'ready' && (
+              <GarmentPicker
+                garments={allGarments}
+                selectedId={selectedGarment?.id ?? null}
+                onSelect={setSelectedGarment}
+              />
+            )}
+            {garmentDepth && (
+              <span className="garment-depth-preview" title="garment depth map">
+                <BitmapCanvas bitmap={garmentDepth} />
+              </span>
+            )}
+          </div>
+        </aside>
       </div>
-
-      {userGarments.status === 'error' && (
-        <p className="error">user garment library error: {userGarments.error}</p>
-      )}
-
-      <GarmentUpload
-        onGarmentAdded={async (stored) => {
-          const garment = await userGarments.addGarment(stored);
-          setSelectedGarment(garment);
-        }}
-      />
-
-      {runError && <p className="error">{runError}</p>}
-      {live.error && <p className="error">live inference error: {live.error}</p>}
-      {garmentError && <p className="error">garment load failed: {garmentError}</p>}
-      {processing && <p className="hint">running inference…</p>}
-      {tryOnStatus === 'pose-not-anchorable' && (
-        <p className="hint">
-          torso not confidently detected — garment can't be anchored on this photo/pose.
-        </p>
-      )}
-      {viewSelection?.hint === 'turn-to-front' && (
-        <p className="hint">turn back toward the camera to see this garment.</p>
-      )}
-      {viewSelection?.hint === 'turn-to-back' && (
-        <p className="hint">keep turning — the back view will appear.</p>
-      )}
-
-      <main>
-        {displayImage ? (
-          <DebugCanvas
-            image={displayImage}
-            result={displayResult}
-            showMask={showMask}
-            showSkeleton={showSkeleton}
-            garment={garmentOverlay}
-            depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
-            personDepthBitmap={mode === 'photo' ? photoDepth : liveDepth.depth}
-            onTryOnStatus={setTryOnStatus}
-          />
-        ) : (
-          <p className="hint">
-            {mode === 'photo'
-              ? 'Upload a photo or pick a test photo to run the pipeline.'
-              : 'Waiting for camera…'}
-          </p>
-        )}
-      </main>
     </div>
   );
 }
