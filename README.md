@@ -53,21 +53,34 @@ touches the network layer, this is the whole "privacy" pitch made literal.
 ```bash
 npm install                    # postinstall copies the LiteRT.js wasm runtime into public/
 npm run fetch-models           # downloads the two .tflite models (~5 MB) into public/models/
-npm run fetch-test-photos      # downloads free-license test photos into public/test-photos/
 npm run dev
 ```
+
+Test photos (free-license Wikimedia Commons stills, see `public/test-photos/ATTRIBUTION.md`)
+are checked into the repo, so the quick-load buttons work right away. Re-fetch
+one with `npm run fetch-test-photos -- --force`, or add a new entry to
+`tools/fetch-test-photos.mjs` and run it once.
 
 Needs a WebGPU-capable browser for the fast path (Chrome/Edge 113+); falls
 back to a Wasm/XNNPack CPU path everywhere else — toggle between them in the
 UI to see the difference (this repo's demo GIF shows both).
 
-To add a garment: drop a background-removed PNG in `public/garments/`, open
-`tools/annotate.html`, click the six anchors, and append the exported JSON to
-`src/garments/catalog.json`. The four garments shipped here are placeholder
-flat-silhouette illustrations (`tools/generate-placeholder-garments.mjs`) —
-real photographic cutouts with clean alpha transparency are surprisingly
-hard to source under a free license, so this is the honest stand-in until
-real catalog photography is annotated.
+The four garments shipped here (two floral dresses, an embroidered kurti, a
+wrap dress) are real product photos, not illustrations.
+`tools/process-new-garments.mjs` takes a raw studio photo (flat or vignetted
+background, in `tools/raw-garments/`), removes the background with a
+flood-fill color-distance key — a plain per-pixel key punches transparent
+holes through any light-colored print motif that happens to resemble the
+backdrop, so the fill only treats a pixel as background if it's actually
+*connected* to the border — crops to the garment's alpha silhouette, and
+suggests the six anchors (shoulders/waist/hem). The heuristic is a starting
+point, not the final word: it can mistake a puff sleeve's bulge for the
+shoulder line, so always render a new garment against a test photo and
+hand-correct anchors that look off before trusting them.
+
+To add a garment by hand instead: drop a background-removed PNG in
+`public/garments/`, open `tools/annotate.html`, click the six anchors, and
+append the exported JSON to `src/garments/catalog.json`.
 
 ## Stack
 
