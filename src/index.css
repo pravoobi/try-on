@@ -10,7 +10,7 @@ body {
 }
 
 .app {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 1rem;
 }
@@ -27,7 +27,7 @@ body {
 }
 
 .garment-sidebar {
-  flex: 0 0 260px;
+  flex: 0 0 320px;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -95,8 +95,14 @@ button:disabled {
 }
 
 .debug-canvas {
+  /* Purely a display-size cap: the canvas's actual pixel resolution (and
+     so the cost of every per-pixel pass — warp, mask, occlusion, shading)
+     is set from the source image/frame dimensions in DebugCanvas.tsx and
+     is completely unaffected by this. Raising it just lets the browser's
+     compositor upscale/downscale the same rendered pixels bigger on
+     screen — free, no extra inference or compositing work. */
   max-width: 100%;
-  max-height: 82vh;
+  max-height: 90vh;
   width: auto;
   height: auto;
   border-radius: 8px;
@@ -113,18 +119,18 @@ button:disabled {
 }
 
 .garment-picker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
 }
 
 .garment-thumb {
-  padding: 0.25rem;
+  padding: 0.4rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 100%;
+  aspect-ratio: 1;
 }
 
 .garment-thumb img {
@@ -134,7 +140,7 @@ button:disabled {
 }
 
 .garment-thumb-none {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: #9ca3af;
 }
 
