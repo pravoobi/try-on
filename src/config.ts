@@ -25,6 +25,36 @@ export const config = {
   webcam: { idealWidth: 640, idealHeight: 480 },
   /** Debug overlay: mask tint opacity. */
   maskOpacity: 0.45,
+  /**
+   * Worn-garment extraction for user uploads (see pipeline/garmentExtract.ts
+   * and workers/matting.worker.ts): background removal alone keeps the whole
+   * foreground person, so a photo of someone WEARING the garment needs the
+   * wearer's own head/arms/legs removed too, via a clothes-parsing model.
+   */
+  garmentExtract: {
+    /**
+     * Human-part pixels (face, hair, arms, legs...) as a fraction of the
+     * matted foreground, above which the photo counts as "worn by a person"
+     * and garment extraction kicks in. Below it (a flat-lay/hanger photo),
+     * the plain background-removal result is kept unchanged — the parsing
+     * model is trained on people wearing clothes and can't be trusted on
+     * flat-lays.
+     */
+    humanPresenceFrac: 0.05,
+    /**
+     * The winning garment class must cover at least this fraction of the
+     * foreground, else extraction reports "no garment found" rather than
+     * shipping a sliver.
+     */
+    minGarmentFrac: 0.05,
+    /**
+     * Box-blur radius (px) applied to the binary garment-class mask before
+     * multiplying with the matting alpha — softens the parsing model's
+     * hard stair-step class edges into the same feathered edge quality the
+     * matting model gives the outer silhouette.
+     */
+    maskBlurPx: 2,
+  },
   /** Quick-load test photos served from /test-photos/ (fetched by npm run fetch-test-photos). */
   testPhotos: [
     'photo-01.jpg',

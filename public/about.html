@@ -143,12 +143,14 @@ main thread ◄──────────────────── comp
 
   <h2>Uploading your own garment</h2>
   <p>
-    "Upload your own garment" also runs a model — background removal — fully
-    on-device, the same way. A photo of a garment on a bed or hanger gets its
-    background stripped, cropped to the garment's own silhouette, and gets
-    auto-suggested anchor points you can drag to adjust. The result is saved
-    in your browser's local storage (IndexedDB) — again, never uploaded
-    anywhere.
+    "Upload your own garment" also runs models — background removal plus a
+    clothes-parsing model — fully on-device, the same way. A photo of a
+    garment on a bed or hanger gets its background stripped; a photo of
+    someone <em>wearing</em> the garment additionally gets the person
+    removed (head, arms, legs), keeping just the top or dress. The result is
+    cropped to the garment's own silhouette, gets auto-suggested anchor
+    points you can drag to adjust, and is saved in your browser's local
+    storage (IndexedDB) — again, never uploaded anywhere.
   </p>
 
   <h2>Model caching</h2>

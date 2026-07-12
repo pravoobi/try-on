@@ -208,19 +208,24 @@ export function GarmentUpload({ onGarmentAdded }: Props) {
       {error && <p className="error">{error}</p>}
 
       {step.kind === 'front-select' && (
-        <label>
-          front photo (plain background works best){' '}
-          <input
-            type="file"
-            accept="image/*"
-            disabled={matting.status !== 'ready'}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = '';
-              if (file) void onFrontFile(file);
-            }}
-          />
-        </label>
+        <>
+          <p className="hint">
+            front photo — flat-lay, on a hanger, or worn by someone (the person is removed
+            automatically, keeping just the top/dress).
+          </p>
+          <label>
+            <input
+              type="file"
+              accept="image/*"
+              disabled={matting.status !== 'ready'}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if (file) void onFrontFile(file);
+              }}
+            />
+          </label>
+        </>
       )}
 
       {(step.kind === 'front-processing' || step.kind === 'back-processing') && (

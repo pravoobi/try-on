@@ -370,6 +370,29 @@ usage):**
   fake-webcam subject: yaw pinned at 0° across 10+ seconds where it
   previously wandered.
 
+**Worn-garment extraction (user report: "you remove the background but not
+the humans"):** MODNet background removal keeps the whole salient
+foreground, so a photo of someone WEARING the garment kept the person too.
+The upload flow now runs a second model — `Xenova/segformer_b2_clothes`
+(SegFormer-B2 human parsing, 18 classes, fp16 ~55MB / q8 ~28MB, lazy like
+the matting model) — and pure logic in `pipeline/garmentExtract.ts`
+(unit-tested, 9 tests) combines the two: when human-part labels
+(face/hair/arms/legs) cover a meaningful fraction of the matted foreground
+(`config.garmentExtract.humanPresenceFrac`), only the DOMINANT garment
+class between Upper-clothes and Dress is kept (matching the app's upload
+categories — a t-shirt-plus-jeans photo extracts the t-shirt rather than
+fusing both), plus Belt/Scarf so those don't punch holes; the class mask
+is box-blurred then multiplied with MODNet's soft alpha for edge quality.
+Design constraints worth keeping: (1) flat-lay/hanger photos (no human
+detected) bypass extraction entirely and keep the plain matting result —
+the parsing model is trained on people wearing clothes and can't be
+trusted on flat-lays, so the previously-working path must never be
+subtracted from; (2) person present but no top/dress found → a friendly
+error rather than silently shipping a person cutout as a "garment".
+Verified E2E in Chrome: uploading test-photos/photo-01 (a real person
+wearing a floral top) extracted just the top — head, arms, and legs gone —
+and the synthetic flat-lay regression came through unchanged.
+
 **Model caching (user report: "the 30MB file re-downloads every time"):**
 transformers.js already caches downloaded model weights via the browser's
 Cache Storage API by default (`env.useBrowserCache`) — no code bug. The
