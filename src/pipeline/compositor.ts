@@ -436,8 +436,9 @@ function applyDepthOcclusion(
   // person's real hand-on-hip photo showed exactly this: one shoulder
   // sample ~40 gray levels below the other three was enough to falsely
   // "occlude" a large fraction of the torso. Sampling densely across the
-  // torso interior (bilinear grid between the 4 keypoints) and taking the
-  // median is robust to that: one bad sample among dozens barely moves it.
+  // torso interior (bilinear grid between the 4 keypoints) and taking a
+  // robust order statistic is safe against that: one bad sample among
+  // dozens barely moves it.
   const torsoSamples: number[] = [];
   const GRID = 5;
   for (let iv = 1; iv < GRID; iv++) {
@@ -451,8 +452,22 @@ function applyDepthOcclusion(
       torsoSamples.push(depthAt(x, y));
     }
   }
+  // The reference is a HIGH percentile of those samples, not the median:
+  // fabric drapes over the torso's front-most surface (chest, belly), so
+  // "where the garment sits" is the near side of the torso's own depth
+  // spread. With the median, anything that protrudes — a belly, most
+  // visibly — reads as measurably closer than the reference and gets
+  // "restored" over the fabric, punching a torso-shaped hole in the
+  // garment. A percentile below 1.0 keeps the outlier robustness the
+  // median was originally chosen for (a stray sample, e.g. an arm crossing
+  // the torso mid-sample, must not become the reference the way a max
+  // would let it).
   torsoSamples.sort((a, b) => a - b);
-  const garmentVal = torsoSamples[Math.floor(torsoSamples.length / 2)];
+  const refIndex = Math.min(
+    torsoSamples.length - 1,
+    Math.floor(torsoSamples.length * config.depthOcclusion.referencePercentile),
+  );
+  const garmentVal = torsoSamples[refIndex];
 
   const { marginGray, softBandGray } = config.depthOcclusion;
   const maskData = new Uint8ClampedArray(bw * bh * 4);

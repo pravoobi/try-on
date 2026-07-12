@@ -25,19 +25,34 @@ function kp(name: Keypoint['name'], x: number, y: number, score = 0.9): Keypoint
   return { name, x, y, score };
 }
 
-/** Frontal pose: full shoulder width, face fully visible. */
+/**
+ * Frontal pose: full shoulder width, face fully visible. A front-facing
+ * person's anatomical LEFT shoulder appears at LARGER image-x (the camera
+ * "mirrors" them) — the L/R-flip back-facing signal keys off this order.
+ */
 function frontalKeypoints(shoulderWidth: number): Keypoint[] {
   return [
-    kp('left_shoulder', 100, 100),
-    kp('right_shoulder', 100 + shoulderWidth, 100),
+    kp('left_shoulder', 100 + shoulderWidth, 100),
+    kp('right_shoulder', 100, 100),
     kp('nose', 100 + shoulderWidth / 2, 80),
-    kp('left_eye', 100 + shoulderWidth / 2 - 5, 75),
-    kp('right_eye', 100 + shoulderWidth / 2 + 5, 75),
+    kp('left_eye', 100 + shoulderWidth / 2 + 5, 75),
+    kp('right_eye', 100 + shoulderWidth / 2 - 5, 75),
   ];
 }
 
-/** Turned pose: narrower shoulder width, optionally with face hidden (facing away). */
+/** Turned pose (still front hemisphere order): narrower shoulder width, optionally with face hidden. */
 function turnedKeypoints(shoulderWidth: number, faceVisible: boolean): Keypoint[] {
+  return [
+    kp('left_shoulder', 100 + shoulderWidth, 100),
+    kp('right_shoulder', 100, 100),
+    kp('nose', 100 + shoulderWidth / 2, 80, faceVisible ? 0.9 : 0.05),
+    kp('left_eye', 100 + shoulderWidth / 2 + 5, 75, faceVisible ? 0.9 : 0.05),
+    kp('right_eye', 100 + shoulderWidth / 2 - 5, 75, faceVisible ? 0.9 : 0.05),
+  ];
+}
+
+/** Back-facing pose: shoulders swapped to image order (anatomical left at SMALLER x), face confidence configurable. */
+function backKeypoints(shoulderWidth: number, faceVisible: boolean): Keypoint[] {
   return [
     kp('left_shoulder', 100, 100),
     kp('right_shoulder', 100 + shoulderWidth, 100),
@@ -66,6 +81,14 @@ describe('updateOrientationCalibration', () => {
   it('decays (does not grow) when the face is not visible, even at a wide width', () => {
     const cal1 = updateOrientationCalibration(INITIAL_ORIENTATION_CALIBRATION, frontalKeypoints(200), CONFIG);
     const cal2 = updateOrientationCalibration(cal1, turnedKeypoints(300, false), CONFIG);
+    expect(cal2.maxShoulderWidth).toBeCloseTo(200 * CONFIG.calibrationDecay, 5);
+  });
+
+  it('decays (does not grow) on a back-facing frame, even with confident face keypoints and a wide width', () => {
+    const cal1 = updateOrientationCalibration(INITIAL_ORIENTATION_CALIBRATION, frontalKeypoints(200), CONFIG);
+    // MoveNet can hallucinate confident nose/eyes on the back of a head —
+    // the flipped shoulder order must veto calibration growth regardless.
+    const cal2 = updateOrientationCalibration(cal1, backKeypoints(300, true), CONFIG);
     expect(cal2.maxShoulderWidth).toBeCloseTo(200 * CONFIG.calibrationDecay, 5);
   });
 
@@ -111,6 +134,17 @@ describe('estimateTorsoOrientation', () => {
     const fullyTurned = estimateTorsoOrientation(turnedKeypoints(195, false), cal, CONFIG);
     expect(fullyTurned!.yawDeg).toBeGreaterThan(CONFIG.backMinYawDeg);
     expect(fullyTurned!.zone).toBe('back');
+  });
+
+  it('reads back-facing from the shoulder L/R flip even when face keypoints stay confident', () => {
+    const cal = { maxShoulderWidth: 200 };
+    // Squared to the camera from behind, but MoveNet still reports a
+    // confident "face" on the back of the head — the flipped shoulder
+    // order alone must land this in the back zone.
+    const o = estimateTorsoOrientation(backKeypoints(195, true), cal, CONFIG);
+    expect(o).not.toBeNull();
+    expect(o!.yawDeg).toBeGreaterThan(CONFIG.backMinYawDeg);
+    expect(o!.zone).toBe('back');
   });
 });
 

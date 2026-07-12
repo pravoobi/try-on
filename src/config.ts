@@ -15,6 +15,14 @@ export const config = {
   smoothingAlpha: 0.4,
   /** Live inference throttle target (Phase 3). */
   targetFps: 15,
+  /**
+   * Webcam capture resolution cap (ideal, not exact — the browser picks
+   * the nearest supported mode). Every per-pixel pass downstream (TPS
+   * warp, mask feather/clip, shading, depth occlusion) scales with frame
+   * area, so an uncapped HD capture makes live mode 3-4x slower for no
+   * visible benefit at preview sizes.
+   */
+  webcam: { idealWidth: 640, idealHeight: 480 },
   /** Debug overlay: mask tint opacity. */
   maskOpacity: 0.45,
   /** Quick-load test photos served from /test-photos/ (fetched by npm run fetch-test-photos). */
@@ -94,6 +102,16 @@ export const config = {
      * docs/plan-3d-garment-assets.md Phase A2 notes).
      */
     blurRadiusPx: 18,
+    /**
+     * Which percentile of the torso depth samples stands in for the
+     * garment's surface. Fabric drapes over the torso's *front-most*
+     * surface (chest, belly), so this must sit near the top of the torso's
+     * own depth spread — with the median, anything that protrudes (a
+     * belly) reads as "in front of the garment" and punches a hole in the
+     * fabric. Below 1.0 for robustness against a stray sample (an arm
+     * crossing the torso during sampling shouldn't become the reference).
+     */
+    referencePercentile: 0.85,
     /** Gray-level tolerance before a person pixel counts as "in front of" the garment (0-255 scale). */
     marginGray: 10,
     /** Width, in gray levels, of the soft occlusion edge ramp. */

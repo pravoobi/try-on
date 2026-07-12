@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { config } from '../config';
 
 export type WebcamStatus = 'idle' | 'requesting' | 'ready' | 'error';
 
@@ -37,7 +38,14 @@ export function useWebcam(): UseWebcam {
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
+        video: {
+          facingMode: 'user',
+          // Cap capture size: every downstream per-pixel pass scales with
+          // frame area, and an uncapped HD webcam makes live mode several
+          // times slower for no visible benefit (see config.webcam).
+          width: { ideal: config.webcam.idealWidth },
+          height: { ideal: config.webcam.idealHeight },
+        },
         audio: false,
       });
       streamRef.current = stream;

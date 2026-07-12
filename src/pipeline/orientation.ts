@@ -11,12 +11,16 @@
  *  - Shoulder width shrinks roughly with cos(yaw) as the torso turns,
  *    relative to a running "widest confidently-frontal" baseline
  *    (calibration, see updateOrientationCalibration).
- *  - Face-keypoint (nose/eyes) confidence drops to ~0 once the person's
- *    back is to the camera. Width alone can't tell "just past profile,
- *    turning back to front" from "almost fully turned away" apart — both
- *    shrink-then-grow width identically — so face visibility disambiguates.
- *    This is the 2D-only stand-in for the plan's "landmark z-order flips
- *    ... nose/eye visibility scores drop" back-facing signal.
+ *  - Two independent back-facing signals disambiguate "just past profile,
+ *    turning back to front" from "almost fully turned away" (width alone
+ *    shrinks-then-grows identically for both): the shoulder pair swapping
+ *    image sides (a front-facing person's anatomical left appears at
+ *    LARGER image-x — the camera "mirrors" them — so left-at-smaller-x
+ *    means facing away; the plan's §5.4.3 "landmark L/R flip"), and
+ *    face-keypoint (nose/eyes) confidence dropping out. Either alone is
+ *    unreliable — MoveNet frequently keeps confident face keypoints on
+ *    the back of a head, and its L/R labels get noisy near profile — so
+ *    treat firing of either as "back hemisphere".
  *
  * Meaningful only in live mode: a single photo has no prior frame to
  * calibrate a "frontal" baseline against (see hooks/useTorsoOrientation.ts).
@@ -81,7 +85,12 @@ export function updateOrientationCalibration(
   }
   const width = Math.hypot(rs.x - ls.x, rs.y - ls.y);
   const faceScore = faceVisibility(map);
-  if (faceScore >= config.faceVisibleThreshold && width > cal.maxShoulderWidth) {
+  // Only a confidently FRONT-facing frame may grow the baseline: face
+  // visible and shoulders in front-facing image order (anatomical left at
+  // larger x) — a squared-to-camera back view has full shoulder width too,
+  // but calibrating on it would be calibrating on the wrong hemisphere.
+  const facingCamera = faceScore >= config.faceVisibleThreshold && ls.x >= rs.x;
+  if (facingCamera && width > cal.maxShoulderWidth) {
     return { maxShoulderWidth: width };
   }
   return { maxShoulderWidth: cal.maxShoulderWidth * config.calibrationDecay };
@@ -109,7 +118,13 @@ export function estimateTorsoOrientation(
   const ratio = cal.maxShoulderWidth > 0 ? Math.min(1, width / cal.maxShoulderWidth) : 1;
   const widthYaw = (Math.acos(ratio) * 180) / Math.PI; // 0..90
 
-  const yawDeg = faceScore < config.faceVisibleThreshold ? 180 - widthYaw : widthYaw;
+  // Back hemisphere when EITHER signal fires (see module comment): the
+  // shoulder pair swapped image sides, or the face keypoints dropped out.
+  // MoveNet keeps confident nose/eye scores on the back of a head often
+  // enough that face visibility alone misses back-facing entirely.
+  const shouldersFlipped = ls.x < rs.x;
+  const backFacing = shouldersFlipped || faceScore < config.faceVisibleThreshold;
+  const yawDeg = backFacing ? 180 - widthYaw : widthYaw;
 
   const zone: TorsoOrientation['zone'] =
     yawDeg <= config.frontMaxYawDeg ? 'front' : yawDeg >= config.backMinYawDeg ? 'back' : 'profile';

@@ -306,6 +306,47 @@ Verified across photo-01: ankle + knee catalog dresses, the lehenga-choli
 the edge top), a hip-length kurti (unchanged), and a user-uploaded
 photographic ankle dress, all with advanced mode on.
 
+**Post-A5 fixes from real-webcam user feedback (first real-person live
+usage):**
+- **Belly-shaped hole in the garment (real bodies vs. test photos):** the
+  depth-occlusion reference was the *median* torso depth, so any part of
+  the torso that protrudes toward the camera — a belly, most visibly —
+  read as "measurably closer than the garment" and got restored over the
+  fabric. Never showed on the slim test-photo models (tiny torso depth
+  spread); showed immediately on a real user. Fabric drapes over the
+  torso's *front-most* surface, so the reference is now a high percentile
+  (`config.depthOcclusion.referencePercentile`, 0.85) of the torso sample
+  grid — still robust against a stray sample (unlike a max), but sitting
+  at the near side of the torso's own depth spread. Hand-on-hip occlusion
+  re-verified on photo-01 after the change.
+- **Live-mode lag:** `getUserMedia` had no resolution constraint, so
+  webcams delivering HD frames made every per-pixel pass (TPS warps ×2
+  with normal maps, shading loop, occlusion blur, mask feather/clip) 3-4×
+  more expensive than the 640×480 the preview needs. Capture is now capped
+  (`config.webcam`, ideal 640×480). If live+advanced is still too slow on
+  mid-range hardware after this, the next lever is the plan's own §5.5
+  advice this codebase currently ignores: move shading out of per-pixel
+  JS into a WebGL pass.
+- **Back view rarely triggering on a real person:** back-facing detection
+  relied solely on nose/eye confidence dropping below a threshold — but
+  MoveNet frequently keeps *confident* face keypoints on the back of a
+  head, so the estimator stayed in the front hemisphere while the user
+  faced away. Added the plan's own §5.4.3 "landmark L/R flip" signal
+  (previously noted in the A5 notes as untestable without a real person,
+  and indeed the first real-person test exposed it): a front-facing
+  person's anatomical left shoulder appears at LARGER image-x, so the
+  shoulder pair swapping sides marks the back hemisphere; either signal
+  (flip or face-dropout) firing now counts, and calibration growth
+  additionally requires un-flipped shoulders so a squared-to-camera back
+  view can't become the "frontal" baseline. Note the test fixtures in
+  orientation.test.ts originally encoded the wrong (unflipped-at-front)
+  geometry and were corrected — keypoint L/R conventions are exactly the
+  kind of thing unit tests silently agree with you about.
+- **Side/profile view (user request, answered honestly, unchanged):** flat
+  front/back photos cannot render a garment's side; the 40-140° profile
+  band fades with a turn hint *by design* (§5.4.3, §8). A true side view
+  needs 3D garment geometry — that's Tier B (§6), not a Tier A bug.
+
 ## 1. Problem statement (from the product owner)
 
 The current 2D TPS warp of flat garment PNGs onto pose keypoints produces
