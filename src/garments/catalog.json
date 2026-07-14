@@ -4,8 +4,8 @@
     "category": "dress",
     "image": "/garments/dress-navy-floral-01.png",
     "anchors": {
-      "shoulderL": [129, 159],
-      "shoulderR": [495, 159],
+      "shoulderL": [177, 56],
+      "shoulderR": [451, 56],
       "waistL": [206, 319],
       "waistR": [389, 319],
       "hemL": [124.7, 1141],
