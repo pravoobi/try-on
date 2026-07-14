@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useRef } from 'react';
 import { config } from '../config';
 import { renderFeatheredMask, tintMask } from '../pipeline/maskRender';
 import { renderLehengaCholiTryOn, renderTryOn, type TryOnStatus } from '../pipeline/compositor';
@@ -60,17 +60,17 @@ interface Props {
   onTryOnStatus?: (status: TryOnStatus | null) => void;
 }
 
-/** Draws the photo, an optional try-on garment layer, and debug overlays (mask tint, skeleton, depth). */
-export function DebugCanvas({
-  image,
-  result,
-  showMask,
-  showSkeleton,
-  garment,
-  depthBitmap,
-  personDepthBitmap,
-  onTryOnStatus,
-}: Props) {
+/**
+ * Draws the photo, an optional try-on garment layer, and debug overlays
+ * (mask tint, skeleton, depth). Forwards its canvas element so a caller can
+ * capture the composited result directly (see App.tsx's photo-capture flow) —
+ * merged with the internal ref this component also needs for its own draw
+ * effect, via mergeRefs below.
+ */
+export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCanvas(
+  { image, result, showMask, showSkeleton, garment, depthBitmap, personDepthBitmap, onTryOnStatus }: Props,
+  forwardedRef,
+) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   const lastStatusRef = useRef<TryOnStatus | null>(null);
 
@@ -201,5 +201,14 @@ export function DebugCanvas({
     }
   }, [image, result, showMask, showSkeleton, garment, depthBitmap, personDepthBitmap, onTryOnStatus]);
 
-  return <canvas ref={ref} className="debug-canvas" />;
-}
+  return (
+    <canvas
+      ref={(node) => {
+        ref.current = node;
+        if (typeof forwardedRef === 'function') forwardedRef(node);
+        else if (forwardedRef) forwardedRef.current = node;
+      }}
+      className="debug-canvas"
+    />
+  );
+});

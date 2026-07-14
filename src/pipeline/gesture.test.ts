@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { INITIAL_SWIPE_STATE, updateSwipeDetection, type SwipeConfig, type SwipeState } from './gesture';
+import {
+  INITIAL_SWIPE_STATE,
+  updateSwipeDetection,
+  type SwipeConfig,
+  type SwipeDirection,
+  type SwipeState,
+} from './gesture';
 import type { Keypoint } from './types';
 
 const CONFIG: SwipeConfig = {
@@ -11,24 +17,25 @@ const CONFIG: SwipeConfig = {
 };
 
 const FRAME_WIDTH = 640;
+const FRAME_HEIGHT = 480;
 
-function wrist(name: 'left_wrist' | 'right_wrist', x: number, score = 0.9): Keypoint[] {
-  return [{ name, x, y: 300, score }];
+function wristAt(name: 'left_wrist' | 'right_wrist', x: number, y: number, score = 0.9): Keypoint[] {
+  return [{ name, x, y, score }];
 }
 
-/** Feeds a sequence of (x, dt) samples through the detector, returning the final state and any swipe seen along the way. */
+/** Feeds a sequence of (x, y) samples through the detector, returning the final state and any swipes seen along the way. */
 function feed(
   state: SwipeState,
   name: 'left_wrist' | 'right_wrist',
-  xs: number[],
+  points: [number, number][],
   stepMs: number,
   startMs = 1000,
-): { state: SwipeState; swipes: (import('./gesture').SwipeDirection | null)[] } {
+): { state: SwipeState; swipes: (SwipeDirection | null)[] } {
   let s = state;
   let t = startMs;
-  const swipes: (import('./gesture').SwipeDirection | null)[] = [];
-  for (const x of xs) {
-    const result = updateSwipeDetection(s, wrist(name, x), FRAME_WIDTH, t, CONFIG);
+  const swipes: (SwipeDirection | null)[] = [];
+  for (const [x, y] of points) {
+    const result = updateSwipeDetection(s, wristAt(name, x, y), FRAME_WIDTH, FRAME_HEIGHT, t, CONFIG);
     s = result.state;
     swipes.push(result.swipe);
     t += stepMs;
@@ -36,79 +43,126 @@ function feed(
   return { state: s, swipes };
 }
 
+const Y0 = 300; // fixed y for pure-horizontal test motions
+const X0 = 300; // fixed x for pure-vertical test motions
+
 describe('updateSwipeDetection', () => {
   it('fires "right" for a steady left-to-right wrist motion past the travel threshold', () => {
     // 640 * 0.22 ≈ 141px minimum travel; go well past it.
-    const xs = [100, 130, 160, 190, 220, 250, 280];
-    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', xs, 70);
+    const pts: [number, number][] = [100, 130, 160, 190, 220, 250, 280].map((x) => [x, Y0]);
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 70);
     expect(swipes.filter((s) => s !== null)).toEqual(['right']);
   });
 
   it('fires "left" for a steady right-to-left wrist motion', () => {
-    const xs = [280, 250, 220, 190, 160, 130, 100];
-    const { swipes } = feed(INITIAL_SWIPE_STATE, 'left_wrist', xs, 70);
+    const pts: [number, number][] = [280, 250, 220, 190, 160, 130, 100].map((x) => [x, Y0]);
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'left_wrist', pts, 70);
     expect(swipes.filter((s) => s !== null)).toEqual(['left']);
   });
 
-  it('does not fire when travel stays below the threshold', () => {
-    const xs = [100, 110, 120, 130, 140, 150]; // 50px total, well under 141px
-    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', xs, 70);
+  it('fires "up" for a steady upward wrist motion (decreasing image-y)', () => {
+    // 480 * 0.22 ≈ 106px minimum travel; go well past it.
+    const pts: [number, number][] = [400, 370, 340, 310, 280, 250, 220].map((y) => [X0, y]);
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 70);
+    expect(swipes.filter((s) => s !== null)).toEqual(['up']);
+  });
+
+  it('fires "down" for a steady downward wrist motion', () => {
+    const pts: [number, number][] = [100, 130, 160, 190, 220, 250, 280].map((y) => [X0, y]);
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 70);
+    expect(swipes.filter((s) => s !== null)).toEqual(['down']);
+  });
+
+  it('picks the dominant axis on a diagonal motion', () => {
+    // Large horizontal travel (180px, well past threshold), small vertical drift (30px, below threshold).
+    const pts: [number, number][] = [
+      [100, 300],
+      [130, 305],
+      [160, 308],
+      [190, 312],
+      [220, 318],
+      [250, 325],
+      [280, 330],
+    ];
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 70);
+    expect(swipes.filter((s) => s !== null)).toEqual(['right']);
+  });
+
+  it('does not fire when travel stays below the threshold on both axes', () => {
+    const pts: [number, number][] = [
+      [100, 300],
+      [110, 305],
+      [120, 308],
+      [130, 300],
+      [140, 295],
+      [150, 300],
+    ];
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 70);
     expect(swipes.every((s) => s === null)).toBe(true);
   });
 
   it('does not fire on a jittery, non-monotonic wrist path even with large total spread', () => {
-    const xs = [100, 250, 110, 260, 105, 255, 100];
-    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', xs, 70);
+    const pts: [number, number][] = [100, 250, 110, 260, 105, 255, 100].map((x) => [x, Y0]);
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 70);
     expect(swipes.every((s) => s === null)).toBe(true);
   });
 
   it('does not fire before minSamples worth of tracking has accumulated', () => {
     // Big jump in just 2 samples should NOT fire (minSamples=5).
-    const xs = [100, 300];
-    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', xs, 70);
+    const pts: [number, number][] = [
+      [100, Y0],
+      [300, Y0],
+    ];
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 70);
     expect(swipes.every((s) => s === null)).toBe(true);
   });
 
   it('resets the buffer when the wrist drops below confidence, requiring a fresh continuous motion', () => {
     let state = INITIAL_SWIPE_STATE;
     let t = 1000;
-    // Build up most of a swipe...
     for (const x of [100, 130, 160, 190]) {
-      const r = updateSwipeDetection(state, wrist('right_wrist', x), FRAME_WIDTH, t, CONFIG);
+      const r = updateSwipeDetection(state, wristAt('right_wrist', x, Y0), FRAME_WIDTH, FRAME_HEIGHT, t, CONFIG);
       state = r.state;
       t += 70;
     }
-    // ...then lose tracking entirely for a frame.
-    const dropped = updateSwipeDetection(state, [], FRAME_WIDTH, t, CONFIG);
+    const dropped = updateSwipeDetection(state, [], FRAME_WIDTH, FRAME_HEIGHT, t, CONFIG);
     expect(dropped.state.right.samples).toHaveLength(0);
     t += 70;
-    // Resuming at the old endpoint alone (single sample) shouldn't immediately fire.
-    const resumed = updateSwipeDetection(dropped.state, wrist('right_wrist', 190), FRAME_WIDTH, t, CONFIG);
+    const resumed = updateSwipeDetection(
+      dropped.state,
+      wristAt('right_wrist', 190, Y0),
+      FRAME_WIDTH,
+      FRAME_HEIGHT,
+      t,
+      CONFIG,
+    );
     expect(resumed.swipe).toBeNull();
   });
 
   it('enforces a cooldown after a fired swipe', () => {
     let state = INITIAL_SWIPE_STATE;
     let t = 1000;
-    const first = feed(state, 'right_wrist', [100, 130, 160, 190, 220, 250, 280], 70, t);
+    const pts: [number, number][] = [100, 130, 160, 190, 220, 250, 280].map((x) => [x, Y0]);
+    const first = feed(state, 'right_wrist', pts, 70, t);
     expect(first.swipes.filter((s) => s !== null)).toEqual(['right']);
     state = first.state;
     t += 7 * 70;
 
-    // Immediately attempt another swipe well within the cooldown window.
-    const second = feed(state, 'right_wrist', [280, 310, 340, 370, 400, 430, 460], 70, t + 10);
+    const pts2: [number, number][] = [280, 310, 340, 370, 400, 430, 460].map((x) => [x, Y0]);
+    const second = feed(state, 'right_wrist', pts2, 70, t + 10);
     expect(second.swipes.every((s) => s === null)).toBe(true);
   });
 
   it('allows a new swipe once the cooldown has elapsed', () => {
     let state = INITIAL_SWIPE_STATE;
     let t = 1000;
-    const first = feed(state, 'right_wrist', [100, 130, 160, 190, 220, 250, 280], 70, t);
+    const pts: [number, number][] = [100, 130, 160, 190, 220, 250, 280].map((x) => [x, Y0]);
+    const first = feed(state, 'right_wrist', pts, 70, t);
     state = first.state;
     t += 7 * 70;
 
-    // Wait past cooldownMs (900ms) before the next attempt.
-    const second = feed(state, 'left_wrist', [280, 250, 220, 190, 160, 130, 100], 70, t + CONFIG.cooldownMs + 10);
+    const pts2: [number, number][] = [280, 250, 220, 190, 160, 130, 100].map((x) => [x, Y0]);
+    const second = feed(state, 'left_wrist', pts2, 70, t + CONFIG.cooldownMs + 10);
     expect(second.swipes.filter((s) => s !== null)).toEqual(['left']);
   });
 
@@ -117,10 +171,10 @@ describe('updateSwipeDetection', () => {
     let t = 1000;
     for (const x of [100, 130, 160, 190, 220, 250, 280]) {
       const kps: Keypoint[] = [
-        { name: 'left_wrist', x: 300, y: 300, score: 0.05 }, // idle, low confidence
-        { name: 'right_wrist', x, y: 300, score: 0.9 },
+        { name: 'left_wrist', x: 300, y: 300, score: 0.05 },
+        { name: 'right_wrist', x, y: Y0, score: 0.9 },
       ];
-      const r = updateSwipeDetection(state, kps, FRAME_WIDTH, t, CONFIG);
+      const r = updateSwipeDetection(state, kps, FRAME_WIDTH, FRAME_HEIGHT, t, CONFIG);
       state = r.state;
       if (r.swipe) expect(r.swipe).toBe('right');
       t += 70;

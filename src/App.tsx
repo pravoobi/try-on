@@ -73,7 +73,6 @@ export default function App() {
   const [showMask, setShowMask] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
   const [selectedGarment, setSelectedGarment] = useState<Garment | null>(null);
-  const [gestureEnabled, setGestureEnabled] = useState(true);
   const [garmentImages, setGarmentImages] = useState<LoadedGarmentImages | null>(null);
   const [garmentError, setGarmentError] = useState<string | null>(null);
   const [tryOnStatus, setTryOnStatus] = useState<TryOnStatus | null>(null);
@@ -152,6 +151,90 @@ export default function App() {
     if (document.fullscreenElement) void document.exitFullscreen();
     setIsFullscreen(false);
   };
+
+  // Gesture hint: shown for a few seconds after entering fullscreen live
+  // view, then fades — enough for a first-time user to read it once
+  // without cluttering the screen for repeat visits.
+  const [showGestureHint, setShowGestureHint] = useState(false);
+  useEffect(() => {
+    if (!isFullscreen) return;
+    setShowGestureHint(true);
+    const t = setTimeout(() => setShowGestureHint(false), 6000);
+    return () => clearTimeout(t);
+  }, [isFullscreen]);
+
+  // Photo capture (gesture: swipe up, or the on-screen button): a 5s
+  // countdown, then a snapshot of the composited fullscreen canvas, then a
+  // review screen (retake / download / share). The captured Blob's object
+  // URL is revoked wherever the review state is left (retake or a fresh
+  // capture), never left to leak.
+  type CaptureState =
+    | { kind: 'idle' }
+    | { kind: 'countdown'; secondsLeft: number }
+    | { kind: 'review'; photoUrl: string; blob: Blob };
+  const [captureState, setCaptureState] = useState<CaptureState>({ kind: 'idle' });
+  const fullscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [shareUnsupported, setShareUnsupported] = useState(false);
+
+  const startCountdown = useCallback(() => {
+    setCaptureState((s) => (s.kind === 'idle' ? { kind: 'countdown', secondsLeft: 5 } : s));
+  }, []);
+
+  const discardPhoto = useCallback(() => {
+    setCaptureState((s) => {
+      if (s.kind === 'review') URL.revokeObjectURL(s.photoUrl);
+      return { kind: 'idle' };
+    });
+    setShareUnsupported(false);
+  }, []);
+
+  const sharePhoto = useCallback(async () => {
+    if (captureState.kind !== 'review') return;
+    const file = new File([captureState.blob], 'try-on.png', { type: 'image/png' });
+    const nav = navigator as Navigator & { canShare?: (data: { files: File[] }) => boolean };
+    if (nav.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'My virtual try-on', text: 'Check out this outfit!' });
+      } catch {
+        // User cancelled the share sheet, or it failed silently — stay on the review screen either way.
+      }
+    } else {
+      setShareUnsupported(true);
+    }
+  }, [captureState]);
+
+  useEffect(() => {
+    if (captureState.kind !== 'countdown') return;
+    if (captureState.secondsLeft <= 0) {
+      const canvas = fullscreenCanvasRef.current;
+      if (!canvas) {
+        setCaptureState({ kind: 'idle' });
+        return;
+      }
+      canvas.toBlob((blob) => {
+        if (blob) setCaptureState({ kind: 'review', photoUrl: URL.createObjectURL(blob), blob });
+        else setCaptureState({ kind: 'idle' });
+      }, 'image/png');
+      return;
+    }
+    const t = setTimeout(() => {
+      setCaptureState((s) => (s.kind === 'countdown' ? { kind: 'countdown', secondsLeft: s.secondsLeft - 1 } : s));
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [captureState]);
+
+  // Revoke the object URL on unmount if a review photo is still pending —
+  // discardPhoto/a fresh capture handle the normal paths, this only covers
+  // the app closing/navigating away mid-review. Reads a ref rather than
+  // setting state during teardown.
+  const captureStateRef = useRef(captureState);
+  captureStateRef.current = captureState;
+  useEffect(() => {
+    return () => {
+      const s = captureStateRef.current;
+      if (s.kind === 'review') URL.revokeObjectURL(s.photoUrl);
+    };
+  }, []);
 
   const run = useCallback(
     async (bitmap: ImageBitmap) => {
@@ -472,26 +555,44 @@ export default function App() {
     [catalog.status, catalog.garments, userGarments.garments],
   );
 
+  // A fresh live session starts wearing something rather than "none" — an
+  // empty first impression in the fullscreen kiosk view. Only fires once
+  // nothing is selected yet; doesn't override a choice already made in
+  // photo mode carrying over into live.
+  useEffect(() => {
+    if (mode === 'live' && !selectedGarment && allGarments.length > 0) {
+      setSelectedGarment(allGarments[0]);
+    }
+  }, [mode, selectedGarment, allGarments]);
+
   // Hands-free garment cycling (see pipeline/gesture.ts + hooks/useGestureSwipe.ts):
-  // a swipe steps through the same list the sidebar/fullscreen picker shows,
-  // wrapping around either end. Starting from "none" (no garment) picks the
-  // first/last one rather than requiring an extra swipe to leave "none".
-  const cycleGarment = useCallback(
+  // a left/right swipe steps through the same list the sidebar/fullscreen
+  // picker shows, wrapping around either end. Starting from "none" (no
+  // garment) picks the first/last one rather than requiring an extra swipe
+  // to leave "none". An upward swipe starts the photo-capture countdown
+  // instead of touching the garment selection; downward is unused for now.
+  const onGesture = useCallback(
     (direction: SwipeDirection) => {
+      if (direction === 'up') {
+        startCountdown();
+        return;
+      }
+      if (direction === 'down') return;
       if (allGarments.length === 0) return;
       const currentIndex = selectedGarment ? allGarments.findIndex((g) => g.id === selectedGarment.id) : -1;
       const delta = direction === 'right' ? 1 : -1;
       const nextIndex = (currentIndex + delta + allGarments.length) % allGarments.length;
       setSelectedGarment(allGarments[nextIndex]);
     },
-    [allGarments, selectedGarment],
+    [allGarments, selectedGarment, startCountdown],
   );
 
   useGestureSwipe(
     live.latest?.result.keypoints ?? null,
     live.latest?.frame.width ?? null,
-    mode === 'live' && gestureEnabled,
-    cycleGarment,
+    live.latest?.frame.height ?? null,
+    mode === 'live',
+    onGesture,
   );
 
   return (
@@ -539,7 +640,13 @@ export default function App() {
               <button className={mode === 'photo' ? 'selected' : ''} onClick={() => setMode('photo')}>
                 photo
               </button>
-              <button className={mode === 'live' ? 'selected' : ''} onClick={() => setMode('live')}>
+              <button
+                className={mode === 'live' ? 'selected' : ''}
+                onClick={() => {
+                  setMode('live');
+                  enterFullscreen();
+                }}
+              >
                 live webcam
               </button>
             </div>
@@ -626,15 +733,7 @@ export default function App() {
 
           {mode === 'live' && (
             <div className="controls">
-              <button onClick={enterFullscreen}>⛶ fullscreen</button>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={gestureEnabled}
-                  onChange={(e) => setGestureEnabled(e.target.checked)}
-                />
-                gesture swipe
-              </label>
+              {!isFullscreen && <button onClick={enterFullscreen}>⛶ fullscreen</button>}
               <span className="hint">
                 {webcam.status === 'requesting' && 'requesting camera access…'}
                 {webcam.status === 'ready' &&
@@ -728,33 +827,46 @@ export default function App() {
       <div ref={fullscreenRef} className={`fullscreen-view${isFullscreen ? ' active' : ''}`}>
         {isFullscreen && (
           <>
-            <div className="fullscreen-main">
-              <button className="fullscreen-close" onClick={exitFullscreenMode}>
+            <div className="fullscreen-canvas-wrap">
+              {displayImage ? (
+                <DebugCanvas
+                  ref={fullscreenCanvasRef}
+                  image={displayImage}
+                  result={displayResult}
+                  showMask={showMask}
+                  showSkeleton={showSkeleton}
+                  garment={garmentOverlay}
+                  depthBitmap={null}
+                  personDepthBitmap={liveDepth.depth}
+                  onTryOnStatus={setTryOnStatus}
+                />
+              ) : (
+                <p className="hint">Waiting for camera…</p>
+              )}
+            </div>
+
+            {viewSelection?.hint === 'turn-to-front' && (
+              <p className="hint fullscreen-hint">turn back toward the camera to see this garment.</p>
+            )}
+            {viewSelection?.hint === 'turn-to-back' && (
+              <p className="hint fullscreen-hint">keep turning — the back view will appear.</p>
+            )}
+
+            {showGestureHint && captureState.kind === 'idle' && (
+              <div className="fullscreen-gesture-hint">
+                ‹ swipe to change outfit › &nbsp;·&nbsp; ↑ swipe up for a photo
+              </div>
+            )}
+
+            <div className="fullscreen-overlay-top">
+              <button onClick={startCountdown} disabled={captureState.kind !== 'idle'}>
+                📷 take photo
+              </button>
+              <button onClick={exitFullscreenMode}>
                 ✕ close
               </button>
-              <div className="fullscreen-canvas-wrap">
-                {displayImage ? (
-                  <DebugCanvas
-                    image={displayImage}
-                    result={displayResult}
-                    showMask={showMask}
-                    showSkeleton={showSkeleton}
-                    garment={garmentOverlay}
-                    depthBitmap={null}
-                    personDepthBitmap={liveDepth.depth}
-                    onTryOnStatus={setTryOnStatus}
-                  />
-                ) : (
-                  <p className="hint">Waiting for camera…</p>
-                )}
-                {viewSelection?.hint === 'turn-to-front' && (
-                  <p className="hint fullscreen-hint">turn back toward the camera to see this garment.</p>
-                )}
-                {viewSelection?.hint === 'turn-to-back' && (
-                  <p className="hint fullscreen-hint">keep turning — the back view will appear.</p>
-                )}
-              </div>
             </div>
+
             <div className="fullscreen-garments">
               {catalog.status === 'ready' && (
                 <GarmentPicker
@@ -764,6 +876,31 @@ export default function App() {
                 />
               )}
             </div>
+
+            {captureState.kind === 'countdown' && (
+              <div className="capture-overlay capture-countdown">
+                <div className="capture-countdown-number">{captureState.secondsLeft}</div>
+                <button onClick={() => setCaptureState({ kind: 'idle' })}>cancel</button>
+              </div>
+            )}
+
+            {captureState.kind === 'review' && (
+              <div className="capture-overlay capture-review">
+                <img src={captureState.photoUrl} alt="captured try-on photo" className="capture-review-image" />
+                {shareUnsupported && (
+                  <p className="hint">
+                    sharing isn't supported in this browser — use download, then share it yourself.
+                  </p>
+                )}
+                <div className="capture-review-actions">
+                  <button onClick={discardPhoto}>↺ retake</button>
+                  <a href={captureState.photoUrl} download="try-on.png">
+                    ⭳ download
+                  </a>
+                  <button onClick={() => void sharePhoto()}>share</button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
