@@ -590,7 +590,6 @@ export default function App() {
   useGestureSwipe(
     live.latest?.result.keypoints ?? null,
     live.latest?.frame.width ?? null,
-    live.latest?.frame.height ?? null,
     mode === 'live',
     onGesture,
   );

@@ -19,7 +19,6 @@ import type { Keypoint } from '../pipeline/types';
 export function useGestureSwipe(
   keypoints: readonly Keypoint[] | null,
   frameWidth: number | null,
-  frameHeight: number | null,
   active: boolean,
   onSwipe: (direction: SwipeDirection) => void,
 ): void {
@@ -38,16 +37,9 @@ export function useGestureSwipe(
       stateRef.current = INITIAL_SWIPE_STATE;
       wasActiveRef.current = true;
     }
-    if (!keypoints || !frameWidth || !frameHeight) return;
-    const { state, swipe } = updateSwipeDetection(
-      stateRef.current,
-      keypoints,
-      frameWidth,
-      frameHeight,
-      performance.now(),
-      config.gesture,
-    );
+    if (!keypoints || !frameWidth) return;
+    const { state, swipe } = updateSwipeDetection(stateRef.current, keypoints, frameWidth, performance.now(), config.gesture);
     stateRef.current = state;
     if (swipe) onSwipeRef.current(swipe);
-  }, [keypoints, frameWidth, frameHeight, active]);
+  }, [keypoints, frameWidth, active]);
 }

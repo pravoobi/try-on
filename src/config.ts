@@ -268,5 +268,7 @@ export const config = {
     /** No new swipe within this many ms of the previous one — one motion should trigger one action, not several. */
     cooldownMs: 900,
     minKeypointScore: 0.3,
+    /** Vertical must beat horizontal by this much (raw pixels) to win a mixed motion — biased toward the primary left/right gesture, see the field's own doc comment in pipeline/gesture.ts. */
+    verticalDominanceMargin: 1.3,
   },
 } as const;
