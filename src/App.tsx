@@ -9,6 +9,7 @@ import { config } from './config';
 import type { Garment } from './garments/schema';
 import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
+import { useGestureSwipe } from './hooks/useGestureSwipe';
 import { useLiveDepth } from './hooks/useLiveDepth';
 import { useLiveTryOn } from './hooks/useLiveTryOn';
 import { usePipeline } from './hooks/usePipeline';
@@ -17,6 +18,7 @@ import { useUserGarments } from './hooks/useUserGarments';
 import { useWebcam } from './hooks/useWebcam';
 import { mirrorAnchorsLR } from './pipeline/anchorMapping';
 import type { TryOnStatus } from './pipeline/compositor';
+import type { SwipeDirection } from './pipeline/gesture';
 import { depthToNormalMap } from './pipeline/normalMap';
 import { foreshortenFactor, selectGarmentView } from './pipeline/orientation';
 import type { Accelerator, PipelineResult } from './pipeline/types';
@@ -71,6 +73,7 @@ export default function App() {
   const [showMask, setShowMask] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
   const [selectedGarment, setSelectedGarment] = useState<Garment | null>(null);
+  const [gestureEnabled, setGestureEnabled] = useState(true);
   const [garmentImages, setGarmentImages] = useState<LoadedGarmentImages | null>(null);
   const [garmentError, setGarmentError] = useState<string | null>(null);
   const [tryOnStatus, setTryOnStatus] = useState<TryOnStatus | null>(null);
@@ -469,6 +472,28 @@ export default function App() {
     [catalog.status, catalog.garments, userGarments.garments],
   );
 
+  // Hands-free garment cycling (see pipeline/gesture.ts + hooks/useGestureSwipe.ts):
+  // a swipe steps through the same list the sidebar/fullscreen picker shows,
+  // wrapping around either end. Starting from "none" (no garment) picks the
+  // first/last one rather than requiring an extra swipe to leave "none".
+  const cycleGarment = useCallback(
+    (direction: SwipeDirection) => {
+      if (allGarments.length === 0) return;
+      const currentIndex = selectedGarment ? allGarments.findIndex((g) => g.id === selectedGarment.id) : -1;
+      const delta = direction === 'right' ? 1 : -1;
+      const nextIndex = (currentIndex + delta + allGarments.length) % allGarments.length;
+      setSelectedGarment(allGarments[nextIndex]);
+    },
+    [allGarments, selectedGarment],
+  );
+
+  useGestureSwipe(
+    live.latest?.result.keypoints ?? null,
+    live.latest?.frame.width ?? null,
+    mode === 'live' && gestureEnabled,
+    cycleGarment,
+  );
+
   return (
     <div className="app">
       <div className="top-bar">
@@ -602,6 +627,14 @@ export default function App() {
           {mode === 'live' && (
             <div className="controls">
               <button onClick={enterFullscreen}>⛶ fullscreen</button>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={gestureEnabled}
+                  onChange={(e) => setGestureEnabled(e.target.checked)}
+                />
+                gesture swipe
+              </label>
               <span className="hint">
                 {webcam.status === 'requesting' && 'requesting camera access…'}
                 {webcam.status === 'ready' &&
@@ -695,30 +728,32 @@ export default function App() {
       <div ref={fullscreenRef} className={`fullscreen-view${isFullscreen ? ' active' : ''}`}>
         {isFullscreen && (
           <>
-            <button className="fullscreen-close" onClick={exitFullscreenMode}>
-              ✕ close
-            </button>
-            <div className="fullscreen-canvas-wrap">
-              {displayImage ? (
-                <DebugCanvas
-                  image={displayImage}
-                  result={displayResult}
-                  showMask={showMask}
-                  showSkeleton={showSkeleton}
-                  garment={garmentOverlay}
-                  depthBitmap={null}
-                  personDepthBitmap={liveDepth.depth}
-                  onTryOnStatus={setTryOnStatus}
-                />
-              ) : (
-                <p className="hint">Waiting for camera…</p>
-              )}
-              {viewSelection?.hint === 'turn-to-front' && (
-                <p className="hint fullscreen-hint">turn back toward the camera to see this garment.</p>
-              )}
-              {viewSelection?.hint === 'turn-to-back' && (
-                <p className="hint fullscreen-hint">keep turning — the back view will appear.</p>
-              )}
+            <div className="fullscreen-main">
+              <button className="fullscreen-close" onClick={exitFullscreenMode}>
+                ✕ close
+              </button>
+              <div className="fullscreen-canvas-wrap">
+                {displayImage ? (
+                  <DebugCanvas
+                    image={displayImage}
+                    result={displayResult}
+                    showMask={showMask}
+                    showSkeleton={showSkeleton}
+                    garment={garmentOverlay}
+                    depthBitmap={null}
+                    personDepthBitmap={liveDepth.depth}
+                    onTryOnStatus={setTryOnStatus}
+                  />
+                ) : (
+                  <p className="hint">Waiting for camera…</p>
+                )}
+                {viewSelection?.hint === 'turn-to-front' && (
+                  <p className="hint fullscreen-hint">turn back toward the camera to see this garment.</p>
+                )}
+                {viewSelection?.hint === 'turn-to-back' && (
+                  <p className="hint fullscreen-hint">keep turning — the back view will appear.</p>
+                )}
+              </div>
             </div>
             <div className="fullscreen-garments">
               {catalog.status === 'ready' && (

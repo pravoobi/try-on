@@ -252,4 +252,20 @@ export const config = {
     fps: 5,
     maxDim: 256,
   },
+  /**
+   * Hands-free garment cycling in live mode (see pipeline/gesture.ts): a
+   * left/right wrist swipe advances/retreats through the garment list,
+   * detected from the pose keypoints already computed every frame.
+   */
+  gesture: {
+    /** Wrist travel across the window, as a fraction of frame width, to count as a swipe. */
+    minTravelFrac: 0.22,
+    /** Rolling window a single swipe attempt is judged over, ms — ~10 frames at the live targetFps. */
+    windowMs: 700,
+    /** Minimum samples in the window before a swipe may fire — rejects a 2-point fluke early in tracking. */
+    minSamples: 5,
+    /** No new swipe within this many ms of the previous one — one motion should change one garment, not several. */
+    cooldownMs: 900,
+    minKeypointScore: 0.3,
+  },
 } as const;
