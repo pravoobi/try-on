@@ -174,6 +174,47 @@ body {
   background: rgba(17, 19, 24, 0.75);
 }
 
+/* On-demand gesture help (the "?" button) — mirrors .fullscreen-overlay-top's
+   positioning but on the LEFT, so it never competes with the close/take-photo
+   buttons on the right, and sits clear of the garment picker (right column on
+   desktop, bottom strip on mobile — see that section's own mobile override). */
+.fullscreen-help {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 3;
+}
+
+.fullscreen-help-button {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(17, 19, 24, 0.75);
+  font-weight: 700;
+}
+
+.fullscreen-help-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  width: 190px;
+  background: rgba(17, 19, 24, 0.9);
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.fullscreen-help-panel p {
+  margin: 0;
+}
+
+.fullscreen-help-panel p + p {
+  margin-top: 0.6rem;
+}
+
 .fullscreen-garments {
   position: absolute;
   top: 50%;
@@ -664,6 +705,11 @@ main {
     right: max(0.75rem, env(safe-area-inset-right));
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+
+  .fullscreen-help {
+    top: max(0.75rem, env(safe-area-inset-top));
+    left: max(0.75rem, env(safe-area-inset-left));
   }
 
   .fullscreen-hint {

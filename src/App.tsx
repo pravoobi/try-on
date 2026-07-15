@@ -163,6 +163,15 @@ export default function App() {
     return () => clearTimeout(t);
   }, [isFullscreen]);
 
+  // On-demand gesture help (the "?" button) — a persistent way to re-read
+  // the same instructions the auto-fading hint above only shows once per
+  // session. Reset on every fullscreen exit so it never silently reopens
+  // pinned on the next entry.
+  const [showGestureHelp, setShowGestureHelp] = useState(false);
+  useEffect(() => {
+    if (!isFullscreen) setShowGestureHelp(false);
+  }, [isFullscreen]);
+
   // Photo capture (gesture: swipe up, or the on-screen button): a 5s
   // countdown, then a snapshot of the composited fullscreen canvas, then a
   // review screen (retake / download / share). The captured Blob's object
@@ -854,6 +863,33 @@ export default function App() {
             {showGestureHint && captureState.kind === 'idle' && (
               <div className="fullscreen-gesture-hint">
                 ‹ swipe to change outfit › &nbsp;·&nbsp; ↑ swipe up for a photo
+              </div>
+            )}
+
+            {captureState.kind === 'idle' && (
+              <div className="fullscreen-help">
+                <button
+                  className="fullscreen-help-button"
+                  onClick={() => setShowGestureHelp((v) => !v)}
+                  aria-expanded={showGestureHelp}
+                  aria-label="gesture help"
+                >
+                  ?
+                </button>
+                {showGestureHelp && (
+                  <div className="fullscreen-help-panel">
+                    <p>
+                      <strong>‹ swipe left/right ›</strong>
+                      <br />
+                      change the outfit
+                    </p>
+                    <p>
+                      <strong>↑ swipe up</strong>
+                      <br />
+                      take a photo
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
