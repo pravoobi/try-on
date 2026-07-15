@@ -541,3 +541,170 @@ main {
 .status-dot.warn {
   background: #fab219;
 }
+
+/* ===========================================================================
+   Mobile-only adjustments (max-width: 720px). Desktop is untouched — every
+   rule here targets the exact same selectors used above and wins purely by
+   appearing later in the cascade at equal specificity, scoped behind this
+   one breakpoint. Two deliberate layout changes (user-selected):
+     1. Main page: garment picker moves from a 320px side column to a
+        full-width horizontal-scroll strip below the canvas.
+     2. Fullscreen live kiosk: garment picker moves from a right-side
+        vertical column to a thumb-reachable bottom horizontal strip.
+   Everything else here is touch-target sizing (buttons/checkboxes/labels)
+   and switching from the desktop's two independently-scrolling panes to
+   one natural page scroll — nested scroll regions are fragile on touch
+   (scroll-chaining, accidental horizontal drags) and the fixed-height
+   shell has no slack once controls wrap to extra rows on a narrow screen.
+   =========================================================================== */
+@media (max-width: 720px) {
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 100%;
+  }
+
+  body {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .app {
+    height: auto;
+    min-height: 100%;
+    padding: 0.75rem;
+  }
+
+  .top-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .perf-stats {
+    justify-content: flex-start;
+  }
+
+  .layout {
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .main-column {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .debug-canvas {
+    /* Leaves room for the garment strip below without the page needing a
+       huge scroll to reach it. */
+    max-height: 55vh;
+  }
+
+  /* Garment picker: a fixed-height row below the canvas instead of a
+     320px side column (see block comment above). */
+  .garment-sidebar {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .garment-sidebar-list {
+    flex: 0 0 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-right: 0;
+    padding-bottom: 0.35rem;
+  }
+
+  .garment-sidebar-list .garment-picker {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  .garment-sidebar-list .garment-thumb {
+    flex: 0 0 76px;
+    width: 76px;
+    height: 76px;
+  }
+
+  /* Bigger touch targets throughout — the desktop sizes (tuned for a
+     mouse pointer) are too small to reliably tap. */
+  button,
+  select,
+  .capture-review-actions a {
+    padding: 0.6rem 1rem;
+    font-size: 1rem;
+  }
+
+  .segmented button {
+    padding: 0.6rem 1rem;
+  }
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 44px;
+  }
+
+  input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Fullscreen live kiosk: garment picker moves to a bottom strip (see
+     block comment above) — thumb-reachable while holding the phone,
+     matching the common camera-app filter-strip pattern. Positions
+     account for notch/home-indicator safe areas (index.html sets
+     viewport-fit=cover so env() reports real values here); the max()
+     fallback keeps a sane margin on devices without any inset. */
+  .fullscreen-overlay-top {
+    top: max(0.75rem, env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .fullscreen-hint {
+    /* Moved up from bottom-center, which is now the garment strip's spot. */
+    top: max(4.5rem, calc(env(safe-area-inset-top) + 4rem));
+    bottom: auto;
+  }
+
+  .fullscreen-garments {
+    top: auto;
+    left: max(0.75rem, env(safe-area-inset-left));
+    right: max(0.75rem, env(safe-area-inset-right));
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    transform: none;
+    max-height: none;
+    max-width: none;
+    /* The single scroll container for the strip — overflow-x/-y must both
+       be set explicitly (not left at the desktop's overflow-y:auto with
+       overflow-x implicitly "visible"): per spec, when one axis is
+       non-visible and the other isn't, browsers silently promote the
+       "visible" axis to "auto" too, which would open a second, redundant
+       horizontal scrollbar on this same element in addition to the one
+       declared below. Keeping the inner .garment-picker unscrolled avoids
+       nesting two scroll regions for one strip. */
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .fullscreen-garments .garment-picker {
+    display: flex;
+    flex-wrap: nowrap;
+    width: auto;
+  }
+
+  .fullscreen-garments .garment-thumb {
+    flex: 0 0 72px;
+    width: 72px;
+    height: 72px;
+  }
+
+  .capture-countdown-number {
+    font-size: 6rem;
+  }
+}
