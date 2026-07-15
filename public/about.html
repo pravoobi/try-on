@@ -161,6 +161,16 @@ main thread ◄──────────────────── comp
     "Enhance (3D)" reaching "ready" in a second or two on a repeat visit
     instead of waiting on a fresh download.
   </p>
+  <p>
+    The default segmentation/pose models are served from this site itself.
+    "Enhance (3D)" and "upload your own garment" pull their (larger) model
+    weights from
+    <a href="https://huggingface.co" target="_blank" rel="noopener noreferrer">Hugging Face's</a>
+    CDN on first use — the only third-party network request this app makes.
+    That request carries no photo, video, or garment data — it's a one-time,
+    inbound-only download of the model file itself, cached the same way
+    afterward.
+  </p>
 
   <h2>What this is</h2>
   <p>
@@ -181,6 +191,7 @@ main thread ◄──────────────────── comp
   <footer>
     <a href="https://github.com/pravoobi/try-on" target="_blank" rel="noopener noreferrer">View source on GitHub</a>
     · <a href="./">Back to the app</a>
+    · <a href="./test-photos/ATTRIBUTION.md" target="_blank" rel="noopener noreferrer">Test photo credits</a>
   </footer>
 </div>
 </body>

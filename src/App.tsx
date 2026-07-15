@@ -596,6 +596,20 @@ export default function App() {
     [allGarments, selectedGarment, startCountdown],
   );
 
+  // Delete a user-uploaded garment. GarmentPicker only ever calls this for
+  // ids with the user-upload prefix (see USER_GARMENT_ID_PREFIX), and only
+  // after its own tap-to-arm / tap-again-to-confirm sequence — a blocking
+  // window.confirm() here would freeze the JS thread (and the live
+  // inference loop) for however long the dialog is up, which is a bad idea
+  // sitting on top of a live camera view.
+  const deleteGarment = useCallback(
+    (id: string) => {
+      if (selectedGarment?.id === id) setSelectedGarment(null);
+      void userGarments.removeGarment(id);
+    },
+    [selectedGarment, userGarments],
+  );
+
   useGestureSwipe(
     live.latest?.result.keypoints ?? null,
     live.latest?.frame.width ?? null,
@@ -816,6 +830,7 @@ export default function App() {
                 garments={allGarments}
                 selectedId={selectedGarment?.id ?? null}
                 onSelect={setSelectedGarment}
+                onDelete={deleteGarment}
               />
             )}
             {garmentDepth && (
@@ -908,6 +923,7 @@ export default function App() {
                   garments={allGarments}
                   selectedId={selectedGarment?.id ?? null}
                   onSelect={setSelectedGarment}
+                  onDelete={deleteGarment}
                 />
               )}
             </div>

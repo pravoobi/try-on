@@ -453,13 +453,22 @@ main {
   gap: 0.6rem;
 }
 
+/* The actual grid/flex item — sized here, not on the inner button, so the
+   delete badge (absolutely positioned against this wrapper) can hang off
+   the corner without affecting the button's own layout box. */
+.garment-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+}
+
 .garment-thumb {
   padding: 0.4rem;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  aspect-ratio: 1;
+  height: 100%;
 }
 
 .garment-thumb img {
@@ -476,6 +485,35 @@ main {
 .garment-thumb.selected {
   border-color: #2563eb;
   box-shadow: 0 0 0 1px #2563eb;
+}
+
+/* Delete badge — only rendered for the user's own uploads (never catalog
+   garments), see GarmentPicker.tsx. Small and off to the corner so it
+   doesn't compete visually with the (much larger) selection tap target. */
+.garment-thumb-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 999px;
+  background: #1f2430;
+  font-size: 0.65rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+/* Armed (tap-to-confirm) state — tap once to arm, tap again to actually
+   delete (see GarmentPicker.tsx's DeleteBadge; a non-blocking substitute
+   for window.confirm()). Red reads as "this will delete" without needing
+   a blocking dialog. */
+.garment-thumb-delete.armed {
+  background: #dc2626;
+  color: #fff;
 }
 
 .garment-depth-preview {
@@ -663,7 +701,7 @@ main {
     gap: 0.5rem;
   }
 
-  .garment-sidebar-list .garment-thumb {
+  .garment-sidebar-list .garment-thumb-wrap {
     flex: 0 0 76px;
     width: 76px;
     height: 76px;
@@ -744,10 +782,16 @@ main {
     width: auto;
   }
 
-  .fullscreen-garments .garment-thumb {
+  .fullscreen-garments .garment-thumb-wrap {
     flex: 0 0 72px;
     width: 72px;
     height: 72px;
+  }
+
+  .garment-thumb-delete {
+    width: 26px;
+    height: 26px;
+    font-size: 0.75rem;
   }
 
   .capture-countdown-number {

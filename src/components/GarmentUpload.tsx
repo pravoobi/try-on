@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnchorEditor } from './AnchorEditor';
 import { useMatting } from '../hooks/useMatting';
-import type { StoredUserGarment } from '../garments/userGarmentStore';
+import { USER_GARMENT_ID_PREFIX, type StoredUserGarment } from '../garments/userGarmentStore';
 import {
   GARMENT_CATEGORIES,
   HEM_LENGTHS,
@@ -168,7 +168,7 @@ export function GarmentUpload({ onGarmentAdded }: Props) {
         back ? bitmapToBlob(back.image) : Promise.resolve(null),
       ]);
       const stored: StoredUserGarment = {
-        id: `user-${crypto.randomUUID()}`,
+        id: `${USER_GARMENT_ID_PREFIX}${crypto.randomUUID()}`,
         category,
         front: { imageBlob: frontBlob, anchors: front.anchors },
         ...(backBlob ? { back: { imageBlob: backBlob, anchors: back!.anchors } } : {}),

@@ -27,6 +27,12 @@ const DB_NAME = 'try-on-user-garments';
 const DB_VERSION = 1;
 const STORE_NAME = 'garments';
 
+/** Prefix on every user-uploaded garment's id (see GarmentUpload.tsx) — the
+ * one place catalog and user garments need to be told apart at the UI layer
+ * (e.g. GarmentPicker's delete button, which only ever applies to the
+ * user's own uploads, never the shipped catalog). */
+export const USER_GARMENT_ID_PREFIX = 'user-';
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
