@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createDepthWorker } from '@practics/tryon-core/workers';
 import type {
   DepthAccelerator,
   DepthWorkerRequest,
   DepthWorkerResponse,
-} from '../pipeline/depthTypes';
+} from '@practics/tryon-core';
 
 const STORAGE_KEY = 'try-on:advancedMode';
 
@@ -73,9 +74,7 @@ export function useAdvancedMode(): UseAdvancedMode {
       return;
     }
 
-    const worker = new Worker(new URL('../workers/depth.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    const worker = createDepthWorker();
     workerRef.current = worker;
     const pending = pendingRef.current;
     fileProgressRef.current.clear();

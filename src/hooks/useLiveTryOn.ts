@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { config } from '../config';
-import { smoothKeypoints } from '../pipeline/smoothing';
-import type { Keypoint, PipelineResult } from '../pipeline/types';
+import { smoothKeypoints } from '@practics/tryon-core';
+import type { Keypoint, PipelineResult } from '@practics/tryon-core';
 import type { UsePipeline } from './usePipeline';
 
 export interface LiveFrame {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createInferenceWorker } from '@practics/tryon-core/workers';
 import { assetUrl } from '../assetUrl';
 import { config } from '../config';
 import type {
@@ -6,7 +7,7 @@ import type {
   PipelineResult,
   WorkerRequest,
   WorkerResponse,
-} from '../pipeline/types';
+} from '@practics/tryon-core';
 
 export type PipelineStatus = 'loading' | 'ready' | 'error';
 
@@ -35,9 +36,7 @@ export function usePipeline(accelerator: Accelerator): UsePipeline {
   const seqRef = useRef(0);
 
   useEffect(() => {
-    const worker = new Worker(new URL('../workers/inference.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    const worker = createInferenceWorker();
     workerRef.current = worker;
     const pending = pendingRef.current;
     setStatus('loading');

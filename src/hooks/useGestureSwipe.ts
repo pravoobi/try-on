@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { config } from '../config';
-import { INITIAL_SWIPE_STATE, updateSwipeDetection, type SwipeDirection, type SwipeState } from '../pipeline/gesture';
-import type { Keypoint } from '../pipeline/types';
+import { INITIAL_SWIPE_STATE, updateSwipeDetection, type SwipeDirection, type SwipeState } from '@practics/tryon-core';
+import type { Keypoint } from '@practics/tryon-core';
 
 /**
  * Wires pipeline/gesture.ts into the live pose stream. Only meaningful in

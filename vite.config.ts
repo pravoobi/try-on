@@ -30,5 +30,11 @@ export default defineConfig(({ mode }) => ({
   },
   test: {
     environment: 'node',
+    // Scoped to the app's own tests only — each packages/* workspace has
+    // its own vitest config (e.g. litert-react needs jsdom, this app needs
+    // plain node) and runs its tests independently via `npm run test
+    // --workspaces` (see root package.json's "test:all"), not folded into
+    // a single multi-project run here.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 }));

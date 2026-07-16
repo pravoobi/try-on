@@ -1,0 +1,65 @@
+{
+  "name": "litert-react",
+  "version": "0.1.0",
+  "description": "React hooks for LiteRT.js and Worker-based ML inference: model loading, Web Worker RPC, WebGPU detection with CPU fallback, frame throttling.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "litert",
+    "litertjs",
+    "react",
+    "react-hooks",
+    "web-worker",
+    "webgpu",
+    "on-device-ml",
+    "tensorflow"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pravoobi/try-on.git",
+    "directory": "packages/litert-react"
+  },
+  "peerDependencies": {
+    "@litertjs/core": ">=2.0.0",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@litertjs/core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@litertjs/core": "^2.5.2",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^19.2.17",
+    "jsdom": "^25.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

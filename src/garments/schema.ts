@@ -17,7 +17,7 @@ import {
   type HemLength,
   type SkirtAnchorName,
   type SkirtAnchors,
-} from '../pipeline/types';
+} from '@practics/tryon-core';
 
 export const GARMENT_CATEGORIES = ['kurti', 'dress', 'top', 'lehenga-choli', 'saree'] as const;
 export type GarmentCategory = (typeof GARMENT_CATEGORIES)[number];

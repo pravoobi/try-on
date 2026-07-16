@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ANCHOR_NAMES, type AnchorName, type GarmentAnchors } from '../pipeline/types';
+import { ANCHOR_NAMES, type AnchorName, type GarmentAnchors } from '@practics/tryon-core';
 
 /** Visual guide lines only (not used for warping) — same shape annotate.html draws. */
 const ANCHOR_EDGES: readonly (readonly [AnchorName, AnchorName])[] = [

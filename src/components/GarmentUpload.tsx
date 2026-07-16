@@ -9,8 +9,8 @@ import {
   type GarmentCategory,
   type SleeveLength,
 } from '../garments/schema';
-import { cropToAlphaBBox, suggestAnchors } from '../pipeline/autoAnchor';
-import type { GarmentAnchors, HemLength } from '../pipeline/types';
+import { cropToAlphaBBox, suggestAnchors } from '@practics/tryon-core';
+import type { GarmentAnchors, HemLength } from '@practics/tryon-core';
 
 interface Draft {
   image: ImageBitmap;

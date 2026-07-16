@@ -1,21 +1,42 @@
 import { forwardRef, useEffect, useRef } from 'react';
 import { config } from '../config';
-import { renderFeatheredMask, tintMask } from '../pipeline/maskRender';
-import { renderLehengaCholiTryOn, renderTryOn, type TryOnStatus } from '../pipeline/compositor';
-import type {
-  DepthMapSource,
-  GarmentAnchors,
-  HemLength,
-  KeypointName,
-  PipelineResult,
-  SkirtAnchors,
-} from '../pipeline/types';
-import { SKELETON_EDGES } from '../pipeline/types';
+import {
+  renderFeatheredMask,
+  renderLehengaCholiTryOn,
+  renderTryOn,
+  SKELETON_EDGES,
+  type DepthMapSource,
+  type GarmentAnchors,
+  type HemLength,
+  type KeypointName,
+  type PartialTryOnConfig,
+  type PipelineResult,
+  type SkirtAnchors,
+  tintMask,
+  type TryOnStatus,
+} from '@practics/tryon-core';
 
 /** A close()d ImageBitmap is "detached" and reports width 0 — drawing it throws. */
 function isDetached(source: { width: number } | null | undefined): boolean {
   return !!source && source.width === 0;
 }
+
+/**
+ * This app's own anchor/relighting/depth-occlusion/warp tuning, in the
+ * shape renderTryOn/renderLehengaCholiTryOn's `config` field expects —
+ * without this, both calls would silently fall back to
+ * @practics/tryon-core's own DEFAULT_CONFIG instead of this app's
+ * src/config.ts, which happens to hold identical values today but would
+ * silently stop tracking any future edit to src/config.ts's tuning.
+ */
+const tryOnConfig: PartialTryOnConfig = {
+  minKeypointScore: config.minKeypointScore,
+  anchors: config.anchors,
+  relighting: config.relighting,
+  depthOcclusion: config.depthOcclusion,
+  warpGrid: config.warpGrid,
+  armOcclusionRadiusFactor: config.armOcclusionRadiusFactor,
+};
 
 export type GarmentOverlay =
   | {
@@ -126,6 +147,7 @@ export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCa
           garmentNormal: safeGarment.normal,
           foreshortenFactor: safeGarment.foreshortenFactor,
           viewAlpha: safeGarment.viewAlpha,
+          config: tryOnConfig,
         });
       } else {
         tryOnStatus = renderLehengaCholiTryOn(ctx, {
@@ -142,6 +164,7 @@ export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCa
           lehengaNormal: safeGarment.lehengaNormal,
           foreshortenFactor: safeGarment.foreshortenFactor,
           viewAlpha: safeGarment.viewAlpha,
+          config: tryOnConfig,
         });
       }
     } else {

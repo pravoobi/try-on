@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { MattingWorkerRequest, MattingWorkerResponse } from '../pipeline/mattingTypes';
+import { createMattingWorker } from '@practics/tryon-core/workers';
+import type { MattingWorkerRequest, MattingWorkerResponse } from '@practics/tryon-core';
+import { config } from '../config';
 
 export type MattingStatus = 'off' | 'downloading' | 'ready' | 'error';
 
@@ -49,9 +51,7 @@ export function useMatting(): UseMatting {
       return;
     }
 
-    const worker = new Worker(new URL('../workers/matting.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    const worker = createMattingWorker();
     workerRef.current = worker;
     const pending = pendingRef.current;
     fileProgressRef.current.clear();
@@ -97,6 +97,7 @@ export function useMatting(): UseMatting {
     const init: MattingWorkerRequest = {
       type: 'init',
       device: webgpuSupported ? 'webgpu' : 'wasm',
+      garmentExtractConfig: config.garmentExtract,
     };
     worker.postMessage(init);
 

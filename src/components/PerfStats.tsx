@@ -1,5 +1,5 @@
 import { config } from '../config';
-import type { Accelerator } from '../pipeline/types';
+import type { Accelerator } from '@practics/tryon-core';
 
 interface Timings {
   segmentMs: number;

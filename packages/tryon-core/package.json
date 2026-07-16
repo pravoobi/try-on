@@ -1,0 +1,63 @@
+{
+  "name": "@practics/tryon-core",
+  "version": "0.1.0",
+  "description": "Framework-free virtual try-on pipeline: person segmentation, pose estimation, TPS garment warp, and mask/depth-aware compositing — embeddable in any app, on-device, no server.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./workers": {
+      "types": "./dist/workers.d.ts",
+      "import": "./dist/workers.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "virtual-try-on",
+    "on-device-ml",
+    "computer-vision",
+    "pose-estimation",
+    "segmentation",
+    "thin-plate-spline",
+    "litert",
+    "webgpu"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pravoobi/try-on.git",
+    "directory": "packages/tryon-core"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@litertjs/core": "^2.5.2",
+    "@litertjs/tfjs-interop": "^2.5.0",
+    "@tensorflow/tfjs-backend-cpu": "^4.22.0",
+    "@tensorflow/tfjs-backend-webgpu": "^4.22.0",
+    "@tensorflow/tfjs-core": "^4.22.0",
+    "litert-react": "^0.1.0",
+    "thin-plate-spline": "^0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

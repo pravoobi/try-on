@@ -16,12 +16,12 @@ import { usePipeline } from './hooks/usePipeline';
 import { useTorsoOrientation } from './hooks/useTorsoOrientation';
 import { useUserGarments } from './hooks/useUserGarments';
 import { useWebcam } from './hooks/useWebcam';
-import { mirrorAnchorsLR } from './pipeline/anchorMapping';
-import type { TryOnStatus } from './pipeline/compositor';
-import type { SwipeDirection } from './pipeline/gesture';
-import { depthToNormalMap } from './pipeline/normalMap';
-import { foreshortenFactor, selectGarmentView } from './pipeline/orientation';
-import type { Accelerator, PipelineResult } from './pipeline/types';
+import { mirrorAnchorsLR } from '@practics/tryon-core';
+import type { TryOnStatus } from '@practics/tryon-core';
+import type { SwipeDirection } from '@practics/tryon-core';
+import { depthToNormalMap } from '@practics/tryon-core';
+import { foreshortenFactor, selectGarmentView } from '@practics/tryon-core';
+import type { Accelerator, PipelineResult } from '@practics/tryon-core';
 
 /** The advanced-mode normal map(s) for the currently-selected garment
  * (Phase A3) — mirrors LoadedGarmentImages' single/lehenga-choli shape,

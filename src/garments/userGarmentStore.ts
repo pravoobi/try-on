@@ -6,7 +6,7 @@
  * useUserGarments.ts). Uploads are single-piece only for v1 (a phone photo
  * of a shirt); lehenga-choli upload is out of scope.
  */
-import type { GarmentAnchors } from '../pipeline/types';
+import type { GarmentAnchors } from '@practics/tryon-core';
 import type { GarmentCategory, GarmentMeta } from './schema';
 
 export interface StoredGarmentPiece {

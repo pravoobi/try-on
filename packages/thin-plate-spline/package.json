@@ -1,0 +1,45 @@
+{
+  "name": "thin-plate-spline",
+  "version": "0.1.0",
+  "description": "Thin-plate-spline image warping for canvas/OffscreenCanvas — arbitrary point-correspondence warps, rendered as affine-textured triangles. Zero dependencies.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "thin-plate-spline",
+    "tps",
+    "image-warp",
+    "canvas",
+    "offscreencanvas",
+    "warp",
+    "mesh-warp"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pravoobi/try-on.git",
+    "directory": "packages/thin-plate-spline"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}

@@ -6,8 +6,8 @@ import {
   zoneForYaw,
   type OrientationConfig,
   type TorsoOrientation,
-} from '../pipeline/orientation';
-import type { Keypoint } from '../pipeline/types';
+} from '@practics/tryon-core';
+import type { Keypoint } from '@practics/tryon-core';
 
 /**
  * Owns the running orientation-calibration state across live frames (Phase
