@@ -28,6 +28,12 @@ jobs:
 
       - run: npm ci
 
+      # packages/*/dist is gitignored (build output, not source) — the app's
+      # own tsc resolves @practics/tryon-core et al. via their package.json
+      # "types"/"exports" pointing at dist, so those packages must be built
+      # before the app, or a fresh checkout fails with "Cannot find module".
+      - run: npm run build --workspaces --if-present
+
       # Models and test photos are gitignored (fetched binaries, not source —
       # unlike the garment PNGs/catalog, which are committed) — fetch them
       # before building, or the deployed site ships with no models.
