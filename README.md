@@ -6,6 +6,11 @@ ever leaves the browser.
 
 ![Demo: photo try-on across garments, then a WebGPU vs. CPU comparison](docs/demo.gif)
 
+**GitHub topics:** `virtual-try-on` `litert` `litertjs` `webgpu` `react` `react-hooks`
+`tensorflow` `on-device-ml` `computer-vision` `tflite` `thin-plate-spline`
+`image-warping` `pose-estimation` `image-segmentation` `typescript` `vite`
+`npm-package` `monorepo`
+
 ## Why this exists
 
 Most virtual try-on products ship a server-side diffusion model — expensive

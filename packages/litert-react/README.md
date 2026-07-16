@@ -11,6 +11,11 @@ layer extracted from
 on-device virtual try-on app (segmentation + pose estimation running live on
 webcam video, in a Worker, on WebGPU with automatic CPU fallback).
 
+**Topics:** `litert` `litertjs` `react` `react-hooks` `web-worker` `webgpu`
+`on-device-ml` `tensorflow` — see the [source repo's GitHub
+topics](https://github.com/pravoobi/try-on) for the full list across all
+three packages extracted from it.
+
 ## Install
 
 ```bash

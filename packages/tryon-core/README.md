@@ -15,6 +15,11 @@ the image warp.
 No React, no DOM assumptions beyond canvas/`ImageBitmap`/`Worker` — usable
 from a Web Worker or the main thread, in any frontend framework or none.
 
+**Topics:** `virtual-try-on` `on-device-ml` `computer-vision`
+`pose-estimation` `segmentation` `thin-plate-spline` `litert` `webgpu` — see
+the [source repo's GitHub topics](https://github.com/pravoobi/try-on) for
+the full list across all three packages extracted from it.
+
 ## Install
 
 ```bash

@@ -14,6 +14,11 @@ anchors onto a detected body pose — but the API itself has no notion of
 garments, bodies, or any fixed anchor count. It's just point-correspondence
 image warping.
 
+**Topics:** `thin-plate-spline` `tps` `image-warp` `canvas` `offscreencanvas`
+`warp` `mesh-warp` — see the [source repo's GitHub
+topics](https://github.com/pravoobi/try-on) for the full list across all
+three packages extracted from it.
+
 ## Install
 
 ```bash
