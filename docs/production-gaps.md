@@ -39,15 +39,32 @@ priority of the embeddable widget below.
 6. **Advanced-mode passes on GPU** — shading/depth-occlusion are CPU canvas
    loops (~3fps at 720p live); porting to WebGPU shaders makes them
    live-viable.
-7. **Server-side diffusion tier** (IDM-VTON-class or commercial API) — the
-   photorealistic premium render; live mode stays the free instant preview.
+7. ~~Server-side diffusion tier~~ — dropped from the plan (2026-07-18):
+   hosted photorealistic try-on is a crowded, GPU-capital-heavy race
+   (funded startups + Google in Search/Shopping). If merchants demand HD
+   renders, resell a partner API as a pro add-on — never own the infra.
+
+## Business model (decided 2026-07-18)
+
+Freemium widget SaaS. **Free: unlimited on-device try-on** — zero marginal
+cost per try-on is the structural pricing advantage metered per-render
+competitors can't match; the "powered by" badge is the acquisition loop.
+**Pro (flat per-store monthly): analytics** (conversion attribution — the
+ROI proof), **customization/white-label**, and **done-for-you catalog
+onboarding** (doubles as churn killer and switching cost; plain priority
+support rides along). Open-core split: pipeline/packages public (MIT), the
+hosted widget service + Shopify app private.
 
 ## Product/engineering gaps
 
 - **Embeddable widget** — script-tag/iframe wrapper over the npm packages;
   THE deliverable for independent (non-Shopify) stores. Needs: camera
   permission UX, model-asset CDN strategy, theming, a minimal JS API
-  (`mount(el, {catalogUrl})`).
+  (`mount(el, {catalogUrl})`). The hosted half (embed delivery, merchant
+  config, analytics collection, billing) lives in a PRIVATE repo.
+- **Mobile Safari support** — promoted from "testing gap" to LAUNCH
+  BLOCKER: most shoppers are on phones; the wasm fallback must be verified
+  usable on mid-range iPhones/Androids.
 - **Catalog ingestion at scale** — flood-fill bg removal + hand-checked
   anchors won't survive hundreds of SKUs; needs an automated pipeline with
   a human QA step (and sleeve-anchor auto-suggestion; upload flow still
