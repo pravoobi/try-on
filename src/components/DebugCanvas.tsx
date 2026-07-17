@@ -3,7 +3,7 @@ import { config } from '../config';
 import {
   renderFeatheredMask,
   renderLehengaCholiTryOn,
-  renderTryOn,
+  renderOutfitTryOn,
   SKELETON_EDGES,
   type DepthMapSource,
   type GarmentAnchors,
@@ -40,12 +40,22 @@ const tryOnConfig: PartialTryOnConfig = {
 
 export type GarmentOverlay =
   | {
-      kind: 'single';
-      image: ImageBitmap;
-      anchors: GarmentAnchors;
-      hemLength: HemLength;
-      /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
-      normal?: OffscreenCanvas | null;
+      /** Top and/or bottom outfit slots — either may be absent (top-only, pants-only, or both). */
+      kind: 'outfit';
+      top?: {
+        image: ImageBitmap;
+        anchors: GarmentAnchors;
+        hemLength: HemLength;
+        /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
+        normal?: OffscreenCanvas | null;
+      } | null;
+      pants?: {
+        image: ImageBitmap;
+        /** Waistband + per-leg outer hem corners (see schema.ts PantsGarment). */
+        anchors: SkirtAnchors;
+        hemLength: HemLength;
+        normal?: OffscreenCanvas | null;
+      } | null;
       /** Live-mode orientation-aware warp + view fade (Phase A5, see pipeline/orientation.ts). */
       foreshortenFactor?: number;
       viewAlpha?: number;
@@ -113,11 +123,15 @@ export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCa
     const safePersonDepth = personDepthBitmap && !isDetached(personDepthBitmap) ? personDepthBitmap : null;
     let safeGarment = garment ?? null;
     if (safeGarment) {
-      const garmentDetached =
-        safeGarment.kind === 'single'
-          ? isDetached(safeGarment.image)
-          : isDetached(safeGarment.choliImage) || isDetached(safeGarment.lehengaImage);
-      if (garmentDetached) safeGarment = null;
+      if (safeGarment.kind === 'lehenga-choli') {
+        if (isDetached(safeGarment.choliImage) || isDetached(safeGarment.lehengaImage)) safeGarment = null;
+      } else {
+        // An outfit's pieces degrade individually: a detached top still
+        // renders the pants (and vice versa); both gone drops the overlay.
+        const top = safeGarment.top && !isDetached(safeGarment.top.image) ? safeGarment.top : null;
+        const pants = safeGarment.pants && !isDetached(safeGarment.pants.image) ? safeGarment.pants : null;
+        safeGarment = top || pants ? { ...safeGarment, top, pants } : null;
+      }
     }
 
     const w = image.width;
@@ -135,16 +149,14 @@ export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCa
       ctx.clearRect(0, 0, w, h);
       ctx.drawImage(safeDepth, 0, 0, w, h);
     } else if (safeGarment && result) {
-      if (safeGarment.kind === 'single') {
-        tryOnStatus = renderTryOn(ctx, {
+      if (safeGarment.kind === 'outfit') {
+        tryOnStatus = renderOutfitTryOn(ctx, {
           frame: image,
           maskBitmap: result.maskBitmap,
           keypoints: result.keypoints,
-          garmentImage: safeGarment.image,
-          garmentAnchors: safeGarment.anchors,
-          hemLength: safeGarment.hemLength,
+          top: safeGarment.top,
+          pants: safeGarment.pants,
           personDepth: safePersonDepth,
-          garmentNormal: safeGarment.normal,
           foreshortenFactor: safeGarment.foreshortenFactor,
           viewAlpha: safeGarment.viewAlpha,
           config: tryOnConfig,

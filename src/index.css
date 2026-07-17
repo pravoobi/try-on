@@ -161,6 +161,51 @@ body {
   }
 }
 
+/* Swipe acknowledgment flash (see App.tsx onGesture): a large chevron that
+   pops on the side the hand moved toward and fades — instant confirmation
+   the gesture registered, since the garment itself can take a beat to load
+   and a silent success reads as a miss. pointer-events none: purely
+   decorative, must never eat a tap meant for the controls under it. */
+.swipe-flash {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 7rem;
+  line-height: 1;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.65);
+  z-index: 2;
+  pointer-events: none;
+  animation: swipe-flash-pop 0.65s ease-out forwards;
+}
+
+.swipe-flash-right {
+  right: 8%;
+}
+
+.swipe-flash-left {
+  left: 8%;
+}
+
+@keyframes swipe-flash-pop {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+  }
+  25% {
+    opacity: 1;
+    scale: 1.15;
+  }
+  55% {
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 1;
+  }
+}
+
 .fullscreen-overlay-top {
   position: absolute;
   top: 1rem;

@@ -142,10 +142,26 @@ export function resolveTryOnConfig(partial?: PartialTryOnConfig): TryOnConfig {
 /** Default for gesture.ts's `updateSwipeDetection` — matches the reference app's live-mode gesture tuning. Gesture config is a self-contained, independent concern (garment swipe / photo-capture trigger), so it's exported separately rather than folded into TryOnConfig. */
 export const DEFAULT_GESTURE_CONFIG: SwipeConfig = {
   minTravelFrac: 0.22,
-  windowMs: 700,
-  minSamples: 5,
+  // windowMs/minSamples/minSpanMs are sized to stay satisfiable at
+  // worst-case live tick rates (~3fps under heavy load): samples arrive
+  // once per inference tick, so a high minSamples silently disables
+  // gestures when fps drops — minSpanMs carries the fluke-rejection duty
+  // in a tick-rate-independent way instead.
+  windowMs: 900,
+  minSamples: 3,
+  minSpanMs: 250,
   cooldownMs: 900,
-  minKeypointScore: 0.3,
+  // Return-stroke suppression window (see gesture.ts SwipeState.suppressDirection):
+  // must outlast a leisurely hand return (~1-1.5s after the swipe fires),
+  // while keeping a deliberate direction reversal reasonably responsive.
+  oppositeCooldownMs: 1600,
+  // Deliberately looser than the rendering threshold (0.3): wrist
+  // confidence dips on a fast-moving hand (motion blur), and one
+  // below-threshold frame RESETS that wrist's buffer — at the rendering
+  // threshold, real mid-swipe windows rarely survived. A noisy
+  // low-confidence wrist still can't fire: the travel/monotonicity/span
+  // requirements carry the false-positive rejection.
+  minKeypointScore: 0.2,
   verticalDominanceMargin: 1.3,
 };
 

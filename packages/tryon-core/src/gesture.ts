@@ -37,19 +37,58 @@ export interface SwipeState {
   right: WristBuffer;
   /** No new swipe may fire before this timestamp (performance.now()-scale). */
   cooldownUntil: number;
+  /**
+   * Return-stroke suppression: after a horizontal swipe, the hand travels
+   * BACK — the same distance, monotonic, in the opposite direction — and
+   * once past cooldownUntil that return fired as a real swipe, undoing the
+   * one just made (field-reported as the garment never changing while the
+   * swipe chevrons flashed on every motion). A swipe in `suppressDirection`
+   * is ignored until `suppressUntil`; same-direction swipes only wait out
+   * the ordinary cooldown.
+   */
+  suppressDirection: 'left' | 'right' | null;
+  suppressUntil: number;
 }
 
-export const INITIAL_SWIPE_STATE: SwipeState = { left: EMPTY_BUFFER, right: EMPTY_BUFFER, cooldownUntil: 0 };
+export const INITIAL_SWIPE_STATE: SwipeState = {
+  left: EMPTY_BUFFER,
+  right: EMPTY_BUFFER,
+  cooldownUntil: 0,
+  suppressDirection: null,
+  suppressUntil: 0,
+};
 
 export interface SwipeConfig {
   /** Minimum travel across the window, as a fraction of frame WIDTH (the shared reference for both axes — see module comment), to count as a swipe. */
   minTravelFrac: number;
   /** Rolling time window a single swipe attempt is judged over, ms. */
   windowMs: number;
-  /** Minimum samples within the window before a swipe may fire — rejects a 2-point fluke early in tracking. */
+  /**
+   * Minimum samples within the window before a swipe may fire — rejects a
+   * 2-point fluke early in tracking. Keep this SMALL (samples arrive once
+   * per inference tick, so a high count silently disables gestures when
+   * fps drops under load); sustained-motion rejection is minSpanMs's job,
+   * which is tick-rate-independent.
+   */
   minSamples: number;
+  /**
+   * Minimum time (ms) the buffered motion must span, first sample to last,
+   * before a swipe may fire. The time-based counterpart to minSamples: a
+   * couple of glitchy keypoints microseconds apart can't fire no matter
+   * how far apart they landed, while a genuine swipe tracked at any frame
+   * rate — even a heavily-loaded 3fps — accumulates span in real time.
+   */
+  minSpanMs: number;
   /** No new swipe may fire within this many ms of the previous one — one motion should trigger one action. */
   cooldownMs: number;
+  /**
+   * How long after a horizontal swipe the OPPOSITE horizontal direction
+   * stays suppressed (see SwipeState.suppressDirection — the return-stroke
+   * problem). Longer than cooldownMs because a leisurely hand return lands
+   * well after the ordinary cooldown; bounded so a user who genuinely wants
+   * to reverse direction only waits this long.
+   */
+  oppositeCooldownMs: number;
   /** Wrist keypoint confidence required to extend a swipe buffer at all. */
   minKeypointScore: number;
   /**
@@ -84,11 +123,17 @@ function isMonotonic(samples: readonly WristSample[], axis: 'x' | 'y', sign: num
   return true;
 }
 
-function detectSwipeInBuffer(buf: WristBuffer, frameWidth: number, config: SwipeConfig): SwipeDirection | null {
+function detectSwipeInBuffer(
+  buf: WristBuffer,
+  frameWidth: number,
+  allowUp: boolean,
+  config: SwipeConfig,
+): SwipeDirection | null {
   const { samples } = buf;
   if (samples.length < config.minSamples) return null;
   const first = samples[0];
   const last = samples[samples.length - 1];
+  if (last.t - first.t < config.minSpanMs) return null;
   const dx = last.x - first.x;
   const dy = last.y - first.y;
   // Both axes measured against frame WIDTH, not each axis's own dimension:
@@ -114,7 +159,38 @@ function detectSwipeInBuffer(buf: WristBuffer, frameWidth: number, config: Swipe
   }
   if (!passY) return null;
   if (!isMonotonic(samples, 'y', Math.sign(dy))) return null;
-  return dy > 0 ? 'down' : 'up'; // image y increases downward.
+  // image y increases downward, so dy < 0 is "up".
+  if (dy < 0 && !allowUp) return null;
+  return dy > 0 ? 'down' : 'up';
+}
+
+/**
+ * "Up" (the photo-capture trigger) means *raising a hand overhead* — so it
+ * only counts when the wrist actually ENDS above the shoulder line. The
+ * lead-in of an ordinary sideways swipe is a hand LIFT from the side up to
+ * chest height: a large, monotonic, vertical wrist motion. At low live
+ * fps the fast horizontal part that follows often loses wrist tracking
+ * (motion blur → confidence dip → buffer reset), leaving that cleanly
+ * tracked lift as the whole judged window — which fired the capture
+ * countdown on a swipe meant to change garments (user-reported). A lift
+ * ends near the chest, below the shoulders, so this gate kills the
+ * misfire while a deliberate overhead raise passes it easily. Shoulders
+ * are MoveNet's most reliable keypoints; if neither is confident, "up" is
+ * simply not offered (a capture gesture without a tracked torso is
+ * suspect anyway).
+ */
+function wristEndsAboveShoulders(
+  wrist: Keypoint | undefined,
+  byName: ReadonlyMap<KeypointName, Keypoint>,
+  config: SwipeConfig,
+): boolean {
+  if (!wrist) return false;
+  const shoulders = [byName.get('left_shoulder'), byName.get('right_shoulder')].filter(
+    (s): s is Keypoint => !!s && s.score >= config.minKeypointScore,
+  );
+  if (shoulders.length === 0) return false;
+  const shoulderY = shoulders.reduce((acc, s) => acc + s.y, 0) / shoulders.length;
+  return wrist.y < shoulderY;
 }
 
 export interface SwipeUpdate {
@@ -133,18 +209,56 @@ export function updateSwipeDetection(
   config: SwipeConfig,
 ): SwipeUpdate {
   const byName = new Map(keypoints.map((k) => [k.name, k] as const));
-  const left = updateWristBuffer(state.left, byName.get(WRIST_NAMES[0]), nowMs, config);
-  const right = updateWristBuffer(state.right, byName.get(WRIST_NAMES[1]), nowMs, config);
+  const leftKp = byName.get(WRIST_NAMES[0]);
+  const rightKp = byName.get(WRIST_NAMES[1]);
+  const left = updateWristBuffer(state.left, leftKp, nowMs, config);
+  const right = updateWristBuffer(state.right, rightKp, nowMs, config);
+  const carry = (swipe: null): SwipeUpdate => ({
+    state: {
+      left,
+      right,
+      cooldownUntil: state.cooldownUntil,
+      suppressDirection: state.suppressDirection,
+      suppressUntil: state.suppressUntil,
+    },
+    swipe,
+  });
 
-  if (nowMs < state.cooldownUntil) {
-    return { state: { left, right, cooldownUntil: state.cooldownUntil }, swipe: null };
+  if (nowMs < state.cooldownUntil) return carry(null);
+
+  const swipe =
+    detectSwipeInBuffer(left, frameWidth, wristEndsAboveShoulders(leftKp, byName, config), config) ??
+    detectSwipeInBuffer(right, frameWidth, wristEndsAboveShoulders(rightKp, byName, config), config);
+  if (!swipe) return carry(null);
+  // The return stroke of the previous swipe (see SwipeState.suppressDirection).
+  // CONSUME it — clear the buffers like a fire would, without firing —
+  // otherwise the stroke's samples outlive the suppression window in the
+  // rolling buffer and fire a spurious opposite swipe the moment it expires.
+  if (swipe === state.suppressDirection && nowMs < state.suppressUntil) {
+    return {
+      state: {
+        left: EMPTY_BUFFER,
+        right: EMPTY_BUFFER,
+        cooldownUntil: state.cooldownUntil,
+        suppressDirection: state.suppressDirection,
+        suppressUntil: state.suppressUntil,
+      },
+      swipe: null,
+    };
   }
 
-  const swipe = detectSwipeInBuffer(left, frameWidth, config) ?? detectSwipeInBuffer(right, frameWidth, config);
-  if (!swipe) {
-    return { state: { left, right, cooldownUntil: state.cooldownUntil }, swipe: null };
-  }
   // A completed swipe clears both buffers and starts the cooldown — the
-  // motion that just fired shouldn't immediately chain into another.
-  return { state: { left: EMPTY_BUFFER, right: EMPTY_BUFFER, cooldownUntil: nowMs + config.cooldownMs }, swipe };
+  // motion that just fired shouldn't immediately chain into another — and a
+  // horizontal swipe arms suppression of its own return direction.
+  const suppressDirection = swipe === 'left' ? 'right' : swipe === 'right' ? 'left' : null;
+  return {
+    state: {
+      left: EMPTY_BUFFER,
+      right: EMPTY_BUFFER,
+      cooldownUntil: nowMs + config.cooldownMs,
+      suppressDirection,
+      suppressUntil: suppressDirection ? nowMs + config.oppositeCooldownMs : 0,
+    },
+    swipe,
+  };
 }

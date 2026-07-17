@@ -264,6 +264,60 @@ export function computeLehengaSkirtBodyAnchors(
   return { waistL, waistR, hemL, hemR };
 }
 
+/**
+ * Computes pants body-space anchor targets (waistband + per-leg hem), or
+ * null if the torso isn't confidently visible. Reuses the SkirtAnchors
+ * shape (waistL/R + hemL/R), but the hem semantics differ from a skirt's:
+ * a skirt hem is ONE straight fabric edge flared wide enough to clear both
+ * legs, while pants hems track EACH leg separately — hemL pins the outer
+ * corner of the left pant leg just outside the left knee/ankle keypoint,
+ * hemR the right. The inner-leg edges carry no anchors; the TPS
+ * interpolates them and the person-mask clip (pants are fitted, unlike a
+ * free-hanging skirt) snaps the fabric to the leg silhouette.
+ *
+ * The waistband shares the exact hip-line points a lehenga waistband / a
+ * hip-length top's hem would use, so a future top+pants outfit meets with
+ * no gap. meta.length semantics: knee = shorts, ankle = full-length;
+ * 'hip' is not meaningful for pants (validated upstream in the app schema).
+ */
+export function computePantsBodyAnchors(
+  keypoints: readonly Keypoint[],
+  hemLength: HemLength,
+  config: TryOnConfig,
+): SkirtAnchors | null {
+  const ctx = computeTorsoContext(keypoints, config);
+  if (!ctx) return null;
+
+  const [waistL, waistR] = computeHem(keypoints, 'hip', ctx, config);
+  const centerX = (ctx.hipL[0] + ctx.hipR[0]) / 2;
+  const hipHalfWidth = Math.abs(ctx.hipR[0] - ctx.hipL[0]) / 2;
+  // Same outward margin the skirt stance cover uses: the joint keypoint is
+  // the leg's CENTER line, and the pant leg's outer corner must clear the
+  // leg's own visual edge.
+  const margin = hipHalfWidth * config.anchors.stanceCoverMargin;
+  const signL = Math.sign(ctx.hipL[0] - centerX) || -1;
+  const signR = -signL;
+
+  const [fallbackLy, fallbackRy] = computeHemY(keypoints, hemLength, ctx, config);
+  const pair = HEM_KEYPOINTS[hemLength];
+  const legFor = (name: KeypointName | undefined, waistX: number, fallbackY: number): Point => {
+    const kp = name ? findKeypoint(keypoints, name) : undefined;
+    if (kp && kp.score >= config.minKeypointScore) return [kp.x, kp.y];
+    // Leg not confidently tracked: hang the hem straight down from the
+    // waistband corner (legs sit under the hips in any anchorable pose).
+    return [waistX, fallbackY];
+  };
+  const legL = legFor(pair?.[0], waistL[0], fallbackLy);
+  const legR = legFor(pair?.[1], waistR[0], fallbackRy);
+
+  return {
+    waistL,
+    waistR,
+    hemL: [legL[0] + signL * margin, legL[1]],
+    hemR: [legR[0] + signR * margin, legR[1]],
+  };
+}
+
 const MIRROR_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['shoulderL', 'shoulderR'],
   ['waistL', 'waistR'],

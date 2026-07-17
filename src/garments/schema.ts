@@ -19,8 +19,11 @@ import {
   type SkirtAnchors,
 } from '@practics/tryon-core';
 
-export const GARMENT_CATEGORIES = ['kurti', 'dress', 'top', 'lehenga-choli', 'saree'] as const;
+export const GARMENT_CATEGORIES = ['kurti', 'dress', 'top', 'shirt', 'tshirt', 'pants', 'lehenga-choli', 'saree'] as const;
 export type GarmentCategory = (typeof GARMENT_CATEGORIES)[number];
+
+/** Categories using the standard 6-anchor top pipeline (shoulders/waist/hem) as a single image. */
+export type TopLikeCategory = Exclude<GarmentCategory, 'lehenga-choli' | 'pants'>;
 
 export const SLEEVE_LENGTHS = ['full', 'half', 'sleeveless'] as const;
 export type SleeveLength = (typeof SLEEVE_LENGTHS)[number];
@@ -46,7 +49,7 @@ export interface LehengaSkirtPiece {
 
 export interface SinglePieceGarment {
   id: string;
-  category: Exclude<GarmentCategory, 'lehenga-choli'>;
+  category: TopLikeCategory;
   image: string;
   anchors: GarmentAnchors;
   /**
@@ -68,7 +71,24 @@ export interface LehengaCholiGarment {
   meta: GarmentMeta;
 }
 
-export type Garment = SinglePieceGarment | LehengaCholiGarment;
+/**
+ * Pants/shorts — a lower-body, leg-tracking garment. Uses the 4-point
+ * skirt anchor shape (waistL/R + hemL/R), but the hem anchors mark the
+ * OUTER BOTTOM CORNER OF EACH LEG in the garment image, mapped at runtime
+ * to the wearer's per-leg knee/ankle keypoints (tryon-core's
+ * computePantsBodyAnchors). meta.length: knee = shorts, ankle =
+ * full-length; 'hip' is rejected — hip-length pants aren't a garment.
+ * meta.sleeves is meaningless for pants and pinned to 'sleeveless'.
+ */
+export interface PantsGarment {
+  id: string;
+  category: 'pants';
+  image: string;
+  anchors: SkirtAnchors;
+  meta: GarmentMeta;
+}
+
+export type Garment = SinglePieceGarment | LehengaCholiGarment | PantsGarment;
 
 class GarmentValidationError extends Error {}
 
@@ -170,9 +190,20 @@ export function validateGarment(data: unknown, index?: number): Garment {
     };
   }
 
+  if (obj.category === 'pants') {
+    if (meta.length === 'hip') fail(path, "pants meta.length must be 'knee' (shorts) or 'ankle' (full-length)");
+    return {
+      id: obj.id,
+      category: 'pants',
+      image: validateImagePath(obj.image, `${path}.image`),
+      anchors: validateSkirtAnchors(obj.anchors, `${path}.anchors`),
+      meta,
+    };
+  }
+
   return {
     id: obj.id,
-    category: obj.category as Exclude<GarmentCategory, 'lehenga-choli'>,
+    category: obj.category as TopLikeCategory,
     image: validateImagePath(obj.image, `${path}.image`),
     anchors: validateAnchors(obj.anchors, `${path}.anchors`),
     ...(obj.back !== undefined ? { back: validatePiece(obj.back, `${path}.back`) } : {}),

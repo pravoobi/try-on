@@ -5,7 +5,8 @@ import { USER_GARMENT_ID_PREFIX } from '../garments/userGarmentStore';
 
 interface Props {
   garments: Garment[];
-  selectedId: string | null;
+  /** Ids of every worn garment — up to two with the top+bottom outfit slots (see App.tsx selectGarment). */
+  selectedIds: readonly string[];
   onSelect: (garment: Garment | null) => void;
   /** Only ever called for a garment whose id has the user-upload prefix — the delete button (below) only renders for those. Omit to hide deletion entirely (e.g. a read-only picker). */
   onDelete?: (id: string) => void;
@@ -45,12 +46,12 @@ function DeleteBadge({ id, onDelete }: { id: string; onDelete: (id: string) => v
   );
 }
 
-export function GarmentPicker({ garments, selectedId, onSelect, onDelete }: Props) {
+export function GarmentPicker({ garments, selectedIds, onSelect, onDelete }: Props) {
   return (
     <div className="garment-picker">
       <div className="garment-thumb-wrap">
         <button
-          className={'garment-thumb' + (selectedId === null ? ' selected' : '')}
+          className={'garment-thumb' + (selectedIds.length === 0 ? ' selected' : '')}
           onClick={() => onSelect(null)}
         >
           <span className="garment-thumb-none">none</span>
@@ -63,7 +64,7 @@ export function GarmentPicker({ garments, selectedId, onSelect, onDelete }: Prop
         // strip actually sizes; see .garment-thumb-wrap.
         <div key={g.id} className="garment-thumb-wrap">
           <button
-            className={'garment-thumb' + (g.id === selectedId ? ' selected' : '')}
+            className={'garment-thumb' + (selectedIds.includes(g.id) ? ' selected' : '')}
             onClick={() => onSelect(g)}
             title={`${g.id} (${g.category}, ${g.meta.sleeves}, ${g.meta.length}-length)`}
           >

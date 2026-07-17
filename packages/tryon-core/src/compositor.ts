@@ -15,13 +15,19 @@
  * order ("treat as two garments... composite both").
  */
 import { renderGarmentWarp, type WarpGridOptions } from 'thin-plate-spline';
-import { computeBodyAnchors, computeLehengaSkirtBodyAnchors, foreshortenAnchors } from './anchorMapping.js';
+import {
+  computeBodyAnchors,
+  computeLehengaSkirtBodyAnchors,
+  computePantsBodyAnchors,
+  foreshortenAnchors,
+} from './anchorMapping.js';
 import { resolveTryOnConfig, type PartialTryOnConfig, type TryOnConfig } from './config.js';
 import { clipToMask, openMaskBelow, renderFeatheredMask } from './maskRender.js';
 import { applyGarmentShading, estimateLight, type ShadingBBox } from './relight.js';
 import {
   ANCHOR_NAMES,
   SKIRT_ANCHOR_NAMES,
+  type BodyAnchors,
   type DepthMapSource,
   type GarmentAnchors,
   type HemLength,
@@ -68,73 +74,170 @@ export interface TryOnInput {
 
 export type TryOnStatus = 'ok' | 'pose-not-anchorable';
 
+/** One top-like piece of an outfit (see OutfitTryOnInput). */
+export interface OutfitTopPiece {
+  image: CanvasImageSource & { width: number; height: number };
+  anchors: GarmentAnchors;
+  hemLength: HemLength;
+  /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
+  normal?: (CanvasImageSource & { width: number; height: number }) | null;
+}
+
+/** The pants/shorts piece of an outfit (see PantsTryOnInput for anchor semantics). */
+export interface OutfitPantsPiece {
+  image: CanvasImageSource & { width: number; height: number };
+  anchors: SkirtAnchors;
+  hemLength: HemLength;
+  normal?: (CanvasImageSource & { width: number; height: number }) | null;
+}
+
+export interface OutfitTryOnInput {
+  frame: ImageBitmap;
+  maskBitmap: ImageBitmap;
+  keypoints: readonly Keypoint[];
+  /** Upper-body piece (shirt/tshirt/top/kurti/dress) — optional; an outfit can be pants-only. */
+  top?: OutfitTopPiece | null;
+  /** Lower-body piece — optional; an outfit can be top-only. */
+  pants?: OutfitPantsPiece | null;
+  warpGrid?: WarpGridOptions;
+  armOcclusion?: boolean;
+  armOcclusionRadiusFactor?: number;
+  personDepth?: DepthMapSource | null;
+  /** See TryOnInput.foreshortenFactor (Phase A5) — applied to every piece's body-anchor targets. */
+  foreshortenFactor?: number;
+  /** See TryOnInput.viewAlpha (Phase A5) — applied to the whole outfit. */
+  viewAlpha?: number;
+  config?: PartialTryOnConfig;
+}
+
+/**
+ * The general try-on pass: frame → pants layer → top layer → occlusion.
+ * Pants draw first and the top over them, so a hip-length top's hem covers
+ * the pants waistband (the same seam-hiding order renderLehengaCholiTryOn
+ * uses for skirt/choli). Each piece gets its own clip: pants are fitted
+ * (full person-mask clip — keeps the leg gap open and snaps the anchor-less
+ * inner-leg edges to the legs), a top opens the clip below its waist when
+ * knee/ankle length so the hem drapes free. Arm/hand occlusion runs only
+ * when a top is present — both occlusion implementations are parameterized
+ * around torso anchors a pants-only outfit doesn't have.
+ *
+ * renderTryOn and renderPantsTryOn are thin wrappers over this.
+ */
+export function renderOutfitTryOn(ctx: Canvas2DContext, input: OutfitTryOnInput): TryOnStatus {
+  const { frame, maskBitmap, keypoints } = input;
+  const w = frame.width;
+  const h = frame.height;
+  const config = resolveTryOnConfig(input.config);
+  const warpGrid = input.warpGrid ?? config.warpGrid;
+
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(frame, 0, 0);
+
+  const top = input.top ?? null;
+  const pants = input.pants ?? null;
+  if (!top && !pants) return 'ok';
+
+  const foreshorten = input.foreshortenFactor ?? 1;
+  // Both anchor computations share the same torso-confidence gate, so if
+  // either present piece can't anchor, neither can — one status covers all.
+  let topBody: BodyAnchors | null = null;
+  if (top) {
+    const raw = computeBodyAnchors(keypoints, top.hemLength, config);
+    if (!raw) return 'pose-not-anchorable';
+    topBody = foreshortenAnchors(raw, foreshorten);
+  }
+  let pantsBody: SkirtAnchors | null = null;
+  if (pants) {
+    const raw = computePantsBodyAnchors(keypoints, pants.hemLength, config);
+    if (!raw) return 'pose-not-anchorable';
+    pantsBody = foreshortenAnchors(raw, foreshorten);
+  }
+
+  // Light estimation reads the whole frame — compute once, only if some
+  // piece actually has a normal map to shade with.
+  let light: ReturnType<typeof estimateLight> | null = null;
+  const getLight = () => (light ??= estimateLight(frame, maskBitmap, w, h, config.relighting));
+
+  const feathered = renderFeatheredMask(maskBitmap, w, h);
+  const layers: OffscreenCanvas[] = [];
+
+  if (pants && pantsBody) {
+    const src: Point[] = SKIRT_ANCHOR_NAMES.map((n) => pants.anchors[n]);
+    const dst: Point[] = SKIRT_ANCHOR_NAMES.map((n) => pantsBody[n]);
+    let layer = renderGarmentWarp(pants.image, src, dst, w, h, warpGrid);
+    if (pants.normal) {
+      const normalLayer = renderGarmentWarp(pants.normal, src, dst, w, h, warpGrid);
+      const bbox = toPixelBBox(expandBBox(bboxOfPoints(dst), config.relighting.bboxMarginFrac, w, h));
+      layer = applyGarmentShading(layer, normalLayer, getLight(), bbox, w, h, config.relighting, input.personDepth);
+    }
+    layers.push(clipToMask(layer, w, h, feathered));
+  }
+
+  if (top && topBody) {
+    const src: Point[] = ANCHOR_NAMES.map((n) => top.anchors[n]);
+    const dst: Point[] = ANCHOR_NAMES.map((n) => topBody[n]);
+    let layer = renderGarmentWarp(top.image, src, dst, w, h, warpGrid);
+    if (top.normal) {
+      const normalLayer = renderGarmentWarp(top.normal, src, dst, w, h, warpGrid);
+      const bbox = toPixelBBox(expandedAnchorBBox(topBody, config.relighting.bboxMarginFrac, w, h));
+      layer = applyGarmentShading(layer, normalLayer, getLight(), bbox, w, h, config.relighting, input.personDepth);
+    }
+    // A hip-length top is fitted everywhere, so the person mask clips all of
+    // it; a knee/ankle garment hangs free below the waist — open the clip
+    // there so the hem drapes over the background and the gap between legs.
+    // Open blend is generous (fitted at the waist, free by mid-thigh); the
+    // hem cut is tight — junk in background-removed garment photos (the
+    // original model's shoes) starts right at the hem line.
+    const waistY = (topBody.waistL[1] + topBody.waistR[1]) / 2;
+    const hemY = (topBody.hemL[1] + topBody.hemR[1]) / 2;
+    const skirtLen = hemY - waistY;
+    const clipMask =
+      top.hemLength === 'hip'
+        ? feathered
+        : openMaskBelow(feathered, waistY, skirtLen * 0.2, hemY + skirtLen * 0.03, skirtLen * 0.05);
+    layers.push(clipToMask(layer, w, h, clipMask));
+  }
+
+  ctx.save();
+  ctx.globalAlpha = input.viewAlpha ?? 1;
+  for (const layer of layers) ctx.drawImage(layer, 0, 0);
+  ctx.restore();
+
+  if (topBody && input.armOcclusion !== false) {
+    if (input.personDepth) {
+      applyDepthOcclusion(ctx, frame, input.personDepth, keypoints, topBody, w, h, config);
+    } else {
+      drawArmOcclusion(ctx, frame, keypoints, topBody, input.armOcclusionRadiusFactor ?? config.armOcclusionRadiusFactor);
+    }
+  }
+
+  return 'ok';
+}
+
 /**
  * Draws the composited result into `ctx` (sized frame.width x frame.height).
  * Returns 'pose-not-anchorable' (and draws just the frame) when the torso
  * isn't confidently visible enough to place the garment.
  */
 export function renderTryOn(ctx: Canvas2DContext, input: TryOnInput): TryOnStatus {
-  const { frame, maskBitmap, keypoints, garmentImage, garmentAnchors, hemLength } = input;
-  const w = frame.width;
-  const h = frame.height;
-  const config = resolveTryOnConfig(input.config);
-
-  ctx.clearRect(0, 0, w, h);
-  ctx.drawImage(frame, 0, 0);
-
-  const rawBodyAnchors = computeBodyAnchors(keypoints, hemLength, config);
-  if (!rawBodyAnchors) return 'pose-not-anchorable';
-  const bodyAnchors = foreshortenAnchors(rawBodyAnchors, input.foreshortenFactor ?? 1);
-
-  const srcPoints: Point[] = ANCHOR_NAMES.map((n) => garmentAnchors[n]);
-  const dstPoints: Point[] = ANCHOR_NAMES.map((n) => bodyAnchors[n]);
-
-  const garmentLayer = renderGarmentWarp(
-    garmentImage,
-    srcPoints,
-    dstPoints,
-    w,
-    h,
-    input.warpGrid ?? config.warpGrid,
-  );
-
-  let shadedLayer = garmentLayer;
-  if (input.garmentNormal) {
-    const normalLayer = renderGarmentWarp(input.garmentNormal, srcPoints, dstPoints, w, h, input.warpGrid ?? config.warpGrid);
-    const light = estimateLight(frame, maskBitmap, w, h, config.relighting);
-    const bbox = toPixelBBox(expandedAnchorBBox(bodyAnchors, config.relighting.bboxMarginFrac, w, h));
-    shadedLayer = applyGarmentShading(garmentLayer, normalLayer, light, bbox, w, h, config.relighting, input.personDepth);
-  }
-
-  const feathered = renderFeatheredMask(maskBitmap, w, h);
-  // A hip-length top is fitted everywhere, so the person mask clips all of
-  // it; a knee/ankle garment hangs free below the waist — open the clip
-  // there so the hem drapes over the background and the gap between legs.
-  const waistY = (bodyAnchors.waistL[1] + bodyAnchors.waistR[1]) / 2;
-  const hemY = (bodyAnchors.hemL[1] + bodyAnchors.hemR[1]) / 2;
-  const skirtLen = hemY - waistY;
-  // Open blend is generous (fitted at the waist, free by mid-thigh); the
-  // hem cut is tight — junk in background-removed garment photos (the
-  // original model's shoes) starts right at the hem line.
-  const clipMask =
-    hemLength === 'hip'
-      ? feathered
-      : openMaskBelow(feathered, waistY, skirtLen * 0.2, hemY + skirtLen * 0.03, skirtLen * 0.05);
-  const clipped = clipToMask(shadedLayer, w, h, clipMask);
-  ctx.save();
-  ctx.globalAlpha = input.viewAlpha ?? 1;
-  ctx.drawImage(clipped, 0, 0);
-  ctx.restore();
-
-  if (input.armOcclusion !== false) {
-    if (input.personDepth) {
-      applyDepthOcclusion(ctx, frame, input.personDepth, keypoints, bodyAnchors, w, h, config);
-    } else {
-      drawArmOcclusion(ctx, frame, keypoints, bodyAnchors, input.armOcclusionRadiusFactor ?? config.armOcclusionRadiusFactor);
-    }
-  }
-
-  return 'ok';
+  return renderOutfitTryOn(ctx, {
+    frame: input.frame,
+    maskBitmap: input.maskBitmap,
+    keypoints: input.keypoints,
+    top: {
+      image: input.garmentImage,
+      anchors: input.garmentAnchors,
+      hemLength: input.hemLength,
+      normal: input.garmentNormal,
+    },
+    warpGrid: input.warpGrid,
+    armOcclusion: input.armOcclusion,
+    armOcclusionRadiusFactor: input.armOcclusionRadiusFactor,
+    personDepth: input.personDepth,
+    foreshortenFactor: input.foreshortenFactor,
+    viewAlpha: input.viewAlpha,
+    config: input.config,
+  });
 }
 
 export interface LehengaCholiTryOnInput {
@@ -267,6 +370,59 @@ export function renderLehengaCholiTryOn(ctx: Canvas2DContext, input: LehengaChol
   }
 
   return 'ok';
+}
+
+export interface PantsTryOnInput {
+  frame: ImageBitmap;
+  maskBitmap: ImageBitmap;
+  keypoints: readonly Keypoint[];
+  garmentImage: CanvasImageSource & { width: number; height: number };
+  /** Waistband corners + per-leg outer hem corners in garment-image pixels (same shape as a lehenga skirt's anchors — see computePantsBodyAnchors for how the hem semantics differ). */
+  garmentAnchors: SkirtAnchors;
+  /** knee = shorts, ankle = full-length. */
+  hemLength: HemLength;
+  warpGrid?: WarpGridOptions;
+  personDepth?: DepthMapSource | null;
+  /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `garmentImage`. */
+  garmentNormal?: (CanvasImageSource & { width: number; height: number }) | null;
+  /** See TryOnInput.foreshortenFactor (Phase A5). */
+  foreshortenFactor?: number;
+  /** See TryOnInput.viewAlpha (Phase A5). */
+  viewAlpha?: number;
+  /** See TryOnInput.config. */
+  config?: PartialTryOnConfig;
+}
+
+/**
+ * Try-on render for pants/shorts (lower-body, leg-tracking garment). Unlike
+ * a skirt there is no open-clip below the waist: pants are FITTED, so the
+ * warped fabric is clipped to the person mask everywhere — that is what
+ * keeps the gap between the legs open and snaps the (anchor-less) inner-leg
+ * fabric edges to the leg silhouette. The wearer's own top half is
+ * untouched — pants only paint below their waistband targets.
+ *
+ * No arm/hand occlusion pass: the capsule heuristic and the depth-occlusion
+ * scan are both parameterized around torso/shoulder anchors that a pants
+ * anchor set doesn't have. Hands hanging in front of thighs are covered by
+ * fabric — a visible but rare artifact, revisit if it bothers in practice.
+ */
+export function renderPantsTryOn(ctx: Canvas2DContext, input: PantsTryOnInput): TryOnStatus {
+  return renderOutfitTryOn(ctx, {
+    frame: input.frame,
+    maskBitmap: input.maskBitmap,
+    keypoints: input.keypoints,
+    pants: {
+      image: input.garmentImage,
+      anchors: input.garmentAnchors,
+      hemLength: input.hemLength,
+      normal: input.garmentNormal,
+    },
+    warpGrid: input.warpGrid,
+    personDepth: input.personDepth,
+    foreshortenFactor: input.foreshortenFactor,
+    viewAlpha: input.viewAlpha,
+    config: input.config,
+  });
 }
 
 type BBox = { minX: number; minY: number; maxX: number; maxY: number };

@@ -11,8 +11,24 @@ export const config = {
   litertWasmPath: '/litert-wasm/',
   /** Keypoints below this score are not drawn / not used for anchoring. */
   minKeypointScore: 0.3,
-  /** Exponential smoothing factor for live keypoints (Phase 3): s = α·new + (1−α)·prev. Lower = steadier; keypoint noise propagates into anchor targets, hem stance cover, and the yaw estimate, all of which read as the garment "shaking" on a still subject. */
-  smoothingAlpha: 0.3,
+  /**
+   * One Euro filter over live keypoints (see tryon-core smoothing.ts) —
+   * replaced the fixed-α EMA, whose single α had to trade garment shake on
+   * a still subject against lag during motion; the One Euro cutoff adapts
+   * to measured keypoint speed, giving both. Keypoint noise propagates
+   * into anchor targets, hem stance cover, and the yaw estimate, all of
+   * which read as the garment "moving" on a still subject.
+   */
+  liveSmoothing: {
+    /** Hz — smoothing floor at standstill; lower = steadier still garment. */
+    minCutoffHz: 0.4,
+    /** Cutoff gain per frame-width/second of keypoint speed; higher = less lag when moving. */
+    beta: 3.0,
+    /** Hz — cutoff on the internal speed estimate. */
+    dCutoffHz: 1.0,
+    /** Scores get a plain EMA (a garment shouldn't flicker on/off at the confidence threshold). */
+    scoreAlpha: 0.3,
+  },
   /** Live inference throttle target (Phase 3). */
   targetFps: 15,
   /**
@@ -22,7 +38,21 @@ export const config = {
    * area, so an uncapped HD capture makes live mode 3-4x slower for no
    * visible benefit at preview sizes.
    */
-  webcam: { idealWidth: 640, idealHeight: 480 },
+  webcam: {
+    idealWidth: 1280,
+    idealHeight: 720,
+    /**
+     * Width the live frame is downscaled to before it's handed to the
+     * inference worker (aspect preserved; capture at or below this passes
+     * through untouched). The models letterbox to ≤256px inputs, so this
+     * loses nothing — but the worker's per-frame preprocess (letterbox +
+     * dtype conversion) runs on the full bitmap it receives and scales
+     * with its area: at 1280×720 it dominated the frame budget (~173ms
+     * pose vs ~64ms at 640). Display/compositing still use the full
+     * capture; keypoints are scaled back up in useLiveTryOn.
+     */
+    inferenceMaxWidth: 640,
+  },
   /** Debug overlay: mask tint opacity. */
   maskOpacity: 0.45,
   /**
@@ -261,13 +291,43 @@ export const config = {
   gesture: {
     /** Wrist travel across the window, as a fraction of the relevant frame dimension, to count as a swipe. */
     minTravelFrac: 0.22,
-    /** Rolling window a single swipe attempt is judged over, ms — ~10 frames at the live targetFps. */
-    windowMs: 700,
-    /** Minimum samples in the window before a swipe may fire — rejects a 2-point fluke early in tracking. */
-    minSamples: 5,
+    /**
+     * Rolling window a single swipe attempt is judged over, ms. Sized so
+     * even worst-case live fps (~3fps with advanced mode on) can fit
+     * minSamples ticks in one window; a motion this slow still has to be
+     * monotonic and cross minTravelFrac to fire.
+     */
+    windowMs: 900,
+    /**
+     * Minimum samples in the window before a swipe may fire. Deliberately
+     * low: samples arrive once per inference tick, so this must stay
+     * satisfiable at worst-case live fps (~3fps in advanced mode ⇒ ~2-3
+     * samples per window); the old value of 5 silently disabled gestures
+     * whenever fps dipped. Sustained-motion rejection is minSpanMs's job.
+     */
+    minSamples: 3,
+    /** The swipe must span at least this much real time (ms), first buffered sample to last — fps-independent fluke rejection. */
+    minSpanMs: 250,
     /** No new swipe within this many ms of the previous one — one motion should trigger one action, not several. */
     cooldownMs: 900,
-    minKeypointScore: 0.3,
+    /**
+     * After a left/right swipe, the OPPOSITE direction stays suppressed
+     * this long: the hand traveling back from a swipe retraces the same
+     * distance monotonically the other way, and once past cooldownMs that
+     * return fired as a real swipe — undoing the change it followed
+     * (field-reported as the garment ping-ponging in place while the swipe
+     * chevrons flashed). Longer than a leisurely return (~1-1.5s); short
+     * enough that deliberately reversing direction stays usable.
+     */
+    oppositeCooldownMs: 1600,
+    /**
+     * Looser than the rendering threshold (0.3) on purpose: a fast-moving
+     * hand blurs and its wrist score dips, and one below-threshold frame
+     * resets that wrist's swipe buffer — at 0.3, real mid-swipe windows
+     * rarely survived (field-reported as swipes needing several tries).
+     * Travel/monotonicity/span requirements still reject noise.
+     */
+    minKeypointScore: 0.2,
     /** Vertical must beat horizontal by this much (raw pixels) to win a mixed motion — biased toward the primary left/right gesture, see the field's own doc comment in pipeline/gesture.ts. */
     verticalDominanceMargin: 1.3,
   },

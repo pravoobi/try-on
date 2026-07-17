@@ -6,7 +6,7 @@ import { GarmentPicker } from './components/GarmentPicker';
 import { GarmentUpload } from './components/GarmentUpload';
 import { PerfStats } from './components/PerfStats';
 import { config } from './config';
-import type { Garment } from './garments/schema';
+import type { Garment, LehengaCholiGarment, PantsGarment, SinglePieceGarment } from './garments/schema';
 import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
 import { useGestureSwipe } from './hooks/useGestureSwipe';
@@ -58,6 +58,15 @@ function closeGarmentImages(images: LoadedGarmentImages | null): void {
 
 type Mode = 'photo' | 'live';
 
+/**
+ * What the TOP outfit slot can hold. A lehenga-choli is a complete two-piece
+ * outfit and occupies both slots at once — selecting it clears the bottom
+ * slot, and selecting pants clears it (see selectGarment's slot rules).
+ * Everything else top-like (tshirt/shirt/top/kurti/dress) coexists with
+ * pants in the bottom slot — kurti-over-jeans being the classic combo.
+ */
+type TopSlotGarment = SinglePieceGarment | LehengaCholiGarment;
+
 export default function App() {
   const [mode, setMode] = useState<Mode>('photo');
   const [accelerator, setAccelerator] = useState<Accelerator>('webgpu');
@@ -72,13 +81,42 @@ export default function App() {
   const [runError, setRunError] = useState<string | null>(null);
   const [showMask, setShowMask] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
-  const [selectedGarment, setSelectedGarment] = useState<Garment | null>(null);
+  const [selectedTop, setSelectedTop] = useState<TopSlotGarment | null>(null);
+  const [selectedBottom, setSelectedBottom] = useState<PantsGarment | null>(null);
   const [garmentImages, setGarmentImages] = useState<LoadedGarmentImages | null>(null);
+  const [bottomImage, setBottomImage] = useState<ImageBitmap | null>(null);
   const [garmentError, setGarmentError] = useState<string | null>(null);
   const [tryOnStatus, setTryOnStatus] = useState<TryOnStatus | null>(null);
   const imageRef = useRef<ImageBitmap | null>(null);
   const resultRef = useRef<PipelineResult | null>(null);
   const garmentImagesRef = useRef<LoadedGarmentImages | null>(null);
+  const bottomImageRef = useRef<ImageBitmap | null>(null);
+
+  /**
+   * Applies the slot rules for picking a garment: pants fill the bottom
+   * slot, anything top-like fills the top slot, a lehenga-choli is
+   * exclusive (fills top, clears bottom — and pants selection clears IT).
+   * `toggle` (default true, the picker's behavior) makes tapping the
+   * already-worn garment remove it from its slot; gesture cycling passes
+   * false so wrapping around the list onto a worn garment keeps it worn.
+   */
+  const selectGarment = useCallback((g: Garment | null, opts?: { toggle?: boolean }) => {
+    const toggle = opts?.toggle ?? true;
+    if (!g) {
+      setSelectedTop(null);
+      setSelectedBottom(null);
+      return;
+    }
+    if (g.category === 'pants') {
+      setSelectedBottom((prev) => (toggle && prev?.id === g.id ? null : g));
+      setSelectedTop((prev) => (prev?.category === 'lehenga-choli' ? null : prev));
+    } else if (g.category === 'lehenga-choli') {
+      setSelectedTop((prev) => (toggle && prev?.id === g.id ? null : g));
+      setSelectedBottom(null);
+    } else {
+      setSelectedTop((prev) => (toggle && prev?.id === g.id ? null : g));
+    }
+  }, []);
 
   // Advanced mode (Phase A1, see docs/plan-3d-garment-assets.md): the depth
   // worker + its ~50MB model only exist once the user opts in via the
@@ -300,11 +338,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // Load the selected garment's PNG(s) into ImageBitmap(s) for the compositor
+  // Load the TOP slot's PNG(s) into ImageBitmap(s) for the compositor
   // — one image for a single-piece garment, two (choli + lehenga) for a
-  // lehenga-choli ensemble.
+  // lehenga-choli ensemble. The bottom slot loads independently below.
   useEffect(() => {
-    if (!selectedGarment) {
+    if (!selectedTop) {
       closeGarmentImages(garmentImagesRef.current);
       garmentImagesRef.current = null;
       setGarmentImages(null);
@@ -316,16 +354,16 @@ export default function App() {
     void (async () => {
       try {
         const next: LoadedGarmentImages =
-          selectedGarment.category === 'lehenga-choli'
+          selectedTop.category === 'lehenga-choli'
             ? {
                 kind: 'lehenga-choli',
-                choliImage: await fetchBitmap(selectedGarment.choli.image),
-                lehengaImage: await fetchBitmap(selectedGarment.lehenga.image),
+                choliImage: await fetchBitmap(selectedTop.choli.image),
+                lehengaImage: await fetchBitmap(selectedTop.lehenga.image),
               }
             : {
                 kind: 'single',
-                image: await fetchBitmap(selectedGarment.image),
-                backImage: selectedGarment.back ? await fetchBitmap(selectedGarment.back.image) : null,
+                image: await fetchBitmap(selectedTop.image),
+                backImage: selectedTop.back ? await fetchBitmap(selectedTop.back.image) : null,
               };
         if (cancelled) {
           closeGarmentImages(next);
@@ -341,7 +379,36 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedGarment]);
+  }, [selectedTop]);
+
+  // Bottom (pants) slot image — a single bitmap with the same
+  // load/replace/close lifecycle as the top slot's.
+  useEffect(() => {
+    if (!selectedBottom) {
+      bottomImageRef.current?.close();
+      bottomImageRef.current = null;
+      setBottomImage(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await fetchBitmap(selectedBottom.image);
+        if (cancelled) {
+          next.close();
+          return;
+        }
+        bottomImageRef.current?.close();
+        bottomImageRef.current = next;
+        setBottomImage(next);
+      } catch (err) {
+        if (!cancelled) setGarmentError(err instanceof Error ? err.message : String(err));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBottom]);
 
   // Photo-mode person depth (Phase A1 debug view + Phase A2 depth-tested
   // occlusion; live-mode throttling is Phase A5). Computed whenever it's
@@ -353,7 +420,7 @@ export default function App() {
       mode !== 'photo' ||
       advanced.status !== 'ready' ||
       !image ||
-      !(showDepth || selectedGarment)
+      !(showDepth || selectedTop || selectedBottom)
     ) {
       photoDepthRef.current?.close();
       photoDepthRef.current = null;
@@ -381,7 +448,7 @@ export default function App() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showDepth, mode, advanced.status, image, selectedGarment]);
+  }, [showDepth, mode, advanced.status, image, selectedTop, selectedBottom]);
 
   // Garment depth preview (Phase A1 "done when": depth maps render for
   // garment images too) + normal maps for relighting (Phase A3). A
@@ -469,6 +536,35 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [advanced.status, garmentImages]);
 
+  // Bottom-slot normal map (Phase A3 shading for the pants piece) — same
+  // depth→normal derivation as the top slot's, no preview thumbnail.
+  const [bottomNormal, setBottomNormal] = useState<OffscreenCanvas | null>(null);
+  useEffect(() => {
+    if (advanced.status !== 'ready' || !bottomImage) {
+      setBottomNormal(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const copy = await createImageBitmap(bottomImage);
+        const depth = await advanced.estimateDepth(copy);
+        if (cancelled) {
+          depth.close();
+          return;
+        }
+        setBottomNormal(depthToNormalMap(depth, bottomImage, config.relighting.normalStrength));
+        depth.close(); // only needed to derive the normal map above.
+      } catch {
+        // Best-effort shading; flat rendering still works.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanced.status, bottomImage]);
+
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) void loadBitmap(file);
@@ -489,13 +585,13 @@ export default function App() {
   // has a back piece (schema.ts), so it always resolves hasBack=false and
   // just gets the profile-band fade, never a view swap.
   const viewSelection = useMemo(() => {
-    if (!selectedGarment) return null;
-    const hasBack = selectedGarment.category !== 'lehenga-choli' && !!selectedGarment.back;
+    if (!selectedTop && !selectedBottom) return null;
+    const hasBack = !!selectedTop && selectedTop.category !== 'lehenga-choli' && !!selectedTop.back;
     return selectGarmentView(liveOrientation, hasBack, config.orientation);
-  }, [selectedGarment, liveOrientation]);
+  }, [selectedTop, selectedBottom, liveOrientation]);
 
   const garmentOverlay = useMemo((): GarmentOverlay | null => {
-    if (!selectedGarment || !garmentImages || !viewSelection) return null;
+    if (!viewSelection) return null;
     // Shading is an advanced-mode enhancement (Phase A3): the "shading"
     // checkbox is the A/B toggle demonstrating flat-vs-shaded, so simply
     // omit the normal map(s) when it's off rather than threading a
@@ -509,50 +605,74 @@ export default function App() {
         )
       : 1;
 
-    if (selectedGarment.category === 'lehenga-choli' && garmentImages.kind === 'lehenga-choli') {
+    if (selectedTop?.category === 'lehenga-choli') {
+      // Transient mismatch guard: the slot changed shape and the async image
+      // load hasn't landed yet — skip a render rather than pass mismatched
+      // data (each piece below guards the same way).
+      if (garmentImages?.kind !== 'lehenga-choli') return null;
       return {
         kind: 'lehenga-choli',
         choliImage: garmentImages.choliImage,
-        choliAnchors: selectedGarment.choli.anchors,
+        choliAnchors: selectedTop.choli.anchors,
         lehengaImage: garmentImages.lehengaImage,
-        lehengaAnchors: selectedGarment.lehenga.anchors,
-        skirtLength: selectedGarment.meta.length,
+        lehengaAnchors: selectedTop.lehenga.anchors,
+        skirtLength: selectedTop.meta.length,
         choliNormal: normals?.kind === 'lehenga-choli' ? normals.choliNormal : null,
         lehengaNormal: normals?.kind === 'lehenga-choli' ? normals.lehengaNormal : null,
         foreshortenFactor: factor,
         viewAlpha: viewSelection.alpha,
       };
     }
-    if (selectedGarment.category !== 'lehenga-choli' && garmentImages.kind === 'single') {
+
+    let top: Extract<GarmentOverlay, { kind: 'outfit' }>['top'] = null;
+    if (selectedTop && garmentImages?.kind === 'single') {
       // The back photo's own L/R anchors follow the same image-left/right
       // convention as the front (pipeline/autoAnchor.ts) — mirror them when
       // warping onto the body, since the shoulder that anchors the front's
       // left side anchors the back's right side once viewed from behind
       // (see anchorMapping.mirrorAnchorsLR).
-      const useBack = viewSelection.useBack && garmentImages.backImage && selectedGarment.back;
-      const image = useBack ? garmentImages.backImage! : garmentImages.image;
-      const anchors = useBack ? mirrorAnchorsLR(selectedGarment.back!.anchors) : selectedGarment.anchors;
-      const normal = useBack
-        ? (normals?.kind === 'single' ? normals.backNormal : null)
-        : (normals?.kind === 'single' ? normals.normal : null);
-      return {
-        kind: 'single',
-        image,
-        anchors,
-        hemLength: selectedGarment.meta.length,
-        normal,
-        foreshortenFactor: factor,
-        viewAlpha: viewSelection.alpha,
+      const useBack = viewSelection.useBack && garmentImages.backImage && selectedTop.back;
+      top = {
+        image: useBack ? garmentImages.backImage! : garmentImages.image,
+        anchors: useBack ? mirrorAnchorsLR(selectedTop.back!.anchors) : selectedTop.anchors,
+        hemLength: selectedTop.meta.length,
+        normal: useBack
+          ? (normals?.kind === 'single' ? normals.backNormal : null)
+          : (normals?.kind === 'single' ? normals.normal : null),
       };
     }
-    // Transient mismatch: selectedGarment just changed shape and the async
-    // image load for it hasn't landed yet — skip a render rather than pass
-    // mismatched data.
-    return null;
-  }, [selectedGarment, garmentImages, garmentNormals, showShading, viewSelection, liveOrientation]);
+    const pants: Extract<GarmentOverlay, { kind: 'outfit' }>['pants'] =
+      selectedBottom && bottomImage
+        ? {
+            image: bottomImage,
+            anchors: selectedBottom.anchors,
+            hemLength: selectedBottom.meta.length,
+            normal: showShading ? bottomNormal : null,
+          }
+        : null;
+
+    if (!top && !pants) return null;
+    return { kind: 'outfit', top, pants, foreshortenFactor: factor, viewAlpha: viewSelection.alpha };
+  }, [
+    selectedTop,
+    selectedBottom,
+    garmentImages,
+    bottomImage,
+    garmentNormals,
+    bottomNormal,
+    showShading,
+    viewSelection,
+    liveOrientation,
+  ]);
 
   const displayImage = mode === 'live' ? (live.latest?.frame ?? null) : image;
   const displayResult = mode === 'live' ? (live.latest?.result ?? null) : result;
+
+  /** Both worn slots' ids, for the picker's multi-highlight. */
+  const selectedIds = useMemo(
+    () => [selectedTop?.id, selectedBottom?.id].filter((id): id is string => !!id),
+    [selectedTop, selectedBottom],
+  );
 
   // User-uploaded garments first (most-recently-added on top, so a new
   // upload doesn't require scrolling to find), catalog garments below.
@@ -564,15 +684,31 @@ export default function App() {
     [catalog.status, catalog.garments, userGarments.garments],
   );
 
+  /**
+   * What gesture swipes cycle through: top-slot garments only. Including
+   * pants in the cycle made swipes LOOK dead across the catalog's pants
+   * stretch (field-reported as "gestures did not work for dress change"):
+   * landing on pants swaps the bottom slot, which is invisible under a
+   * knee/ankle dress — the flash fires but nothing on screen changes,
+   * three swipes in a row. Bottoms are picked by tapping the fullscreen
+   * picker instead; the swipe gesture means "change my look's main piece".
+   */
+  const cycleGarments = useMemo(
+    () => allGarments.filter((g): g is TopSlotGarment => g.category !== 'pants'),
+    [allGarments],
+  );
+
   // A fresh live session starts wearing something rather than "none" — an
   // empty first impression in the fullscreen kiosk view. Only fires once
   // nothing is selected yet; doesn't override a choice already made in
   // photo mode carrying over into live.
   useEffect(() => {
-    if (mode === 'live' && !selectedGarment && allGarments.length > 0) {
-      setSelectedGarment(allGarments[0]);
+    if (mode === 'live' && !selectedTop && !selectedBottom && allGarments.length > 0) {
+      // Prefer a top-like garment for the first impression — it's also
+      // where the swipe cycle lives, so the first swipe visibly works.
+      selectGarment(cycleGarments[0] ?? allGarments[0], { toggle: false });
     }
-  }, [mode, selectedGarment, allGarments]);
+  }, [mode, selectedTop, selectedBottom, allGarments, cycleGarments, selectGarment]);
 
   // Hands-free garment cycling (see pipeline/gesture.ts + hooks/useGestureSwipe.ts):
   // a left/right swipe steps through the same list the sidebar/fullscreen
@@ -580,6 +716,14 @@ export default function App() {
   // garment) picks the first/last one rather than requiring an extra swipe
   // to leave "none". An upward swipe starts the photo-capture countdown
   // instead of touching the garment selection; downward is unused for now.
+  // Brief on-screen acknowledgment of a fired swipe (field feedback:
+  // detection misses are silent, so without this a *successful* swipe whose
+  // garment loads a beat later is indistinguishable from a miss — users
+  // kept re-swiping). Keyed so a rapid second swipe restarts the animation.
+  const [swipeFlash, setSwipeFlash] = useState<{ direction: 'left' | 'right'; key: number } | null>(null);
+  const swipeFlashTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(swipeFlashTimeoutRef.current), []);
+
   const onGesture = useCallback(
     (direction: SwipeDirection) => {
       if (direction === 'up') {
@@ -587,13 +731,20 @@ export default function App() {
         return;
       }
       if (direction === 'down') return;
-      if (allGarments.length === 0) return;
-      const currentIndex = selectedGarment ? allGarments.findIndex((g) => g.id === selectedGarment.id) : -1;
+      if (cycleGarments.length === 0) return;
+      setSwipeFlash((prev) => ({ direction, key: (prev?.key ?? 0) + 1 }));
+      clearTimeout(swipeFlashTimeoutRef.current);
+      swipeFlashTimeoutRef.current = setTimeout(() => setSwipeFlash(null), 700);
+      // The cycle only ever changes the top slot, so the worn top IS the
+      // cursor — no separate "last picked" tracking needed.
+      const currentIndex = selectedTop ? cycleGarments.findIndex((g) => g.id === selectedTop.id) : -1;
       const delta = direction === 'right' ? 1 : -1;
-      const nextIndex = (currentIndex + delta + allGarments.length) % allGarments.length;
-      setSelectedGarment(allGarments[nextIndex]);
+      const nextIndex = (currentIndex + delta + cycleGarments.length) % cycleGarments.length;
+      // toggle: false — wrapping the cycle onto the garment already worn
+      // should keep wearing it, not strip it off.
+      selectGarment(cycleGarments[nextIndex], { toggle: false });
     },
-    [allGarments, selectedGarment, startCountdown],
+    [cycleGarments, selectedTop, selectGarment, startCountdown],
   );
 
   // Delete a user-uploaded garment. GarmentPicker only ever calls this for
@@ -604,10 +755,11 @@ export default function App() {
   // sitting on top of a live camera view.
   const deleteGarment = useCallback(
     (id: string) => {
-      if (selectedGarment?.id === id) setSelectedGarment(null);
+      if (selectedTop?.id === id) setSelectedTop(null);
+      if (selectedBottom?.id === id) setSelectedBottom(null);
       void userGarments.removeGarment(id);
     },
-    [selectedGarment, userGarments],
+    [selectedTop, selectedBottom, userGarments],
   );
 
   useGestureSwipe(
@@ -817,7 +969,7 @@ export default function App() {
           <GarmentUpload
             onGarmentAdded={async (stored) => {
               const garment = await userGarments.addGarment(stored);
-              setSelectedGarment(garment);
+              selectGarment(garment, { toggle: false });
             }}
           />
 
@@ -828,8 +980,8 @@ export default function App() {
             {catalog.status === 'ready' && (
               <GarmentPicker
                 garments={allGarments}
-                selectedId={selectedGarment?.id ?? null}
-                onSelect={setSelectedGarment}
+                selectedIds={selectedIds}
+                onSelect={selectGarment}
                 onDelete={deleteGarment}
               />
             )}
@@ -881,6 +1033,12 @@ export default function App() {
               </div>
             )}
 
+            {swipeFlash && captureState.kind === 'idle' && (
+              <div key={swipeFlash.key} className={`swipe-flash swipe-flash-${swipeFlash.direction}`} aria-hidden>
+                {swipeFlash.direction === 'right' ? '›' : '‹'}
+              </div>
+            )}
+
             {captureState.kind === 'idle' && (
               <div className="fullscreen-help">
                 <button
@@ -921,8 +1079,8 @@ export default function App() {
               {catalog.status === 'ready' && (
                 <GarmentPicker
                   garments={allGarments}
-                  selectedId={selectedGarment?.id ?? null}
-                  onSelect={setSelectedGarment}
+                  selectedIds={selectedIds}
+                  onSelect={selectGarment}
                   onDelete={deleteGarment}
                 />
               )}

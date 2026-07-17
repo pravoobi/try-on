@@ -6,8 +6,8 @@ import {
   GARMENT_CATEGORIES,
   HEM_LENGTHS,
   SLEEVE_LENGTHS,
-  type GarmentCategory,
   type SleeveLength,
+  type TopLikeCategory,
 } from '../garments/schema';
 import { cropToAlphaBBox, suggestAnchors } from '@practics/tryon-core';
 import type { GarmentAnchors, HemLength } from '@practics/tryon-core';
@@ -27,11 +27,15 @@ type UploadStep =
   | { kind: 'back-edit'; front: Draft; back: Draft }
   | { kind: 'saving'; front: Draft; back?: Draft };
 
+// Uploads only support top-like categories: the whole flow (auto-anchor
+// suggestion, drag-adjust editor, worn-garment extraction) is built around
+// the 6-anchor shoulders/waist/hem shape — pants' per-leg hem anchors would
+// need their own annotation UI (catalog pants are annotated by hand/tooling).
 const UPLOAD_CATEGORIES = GARMENT_CATEGORIES.filter(
-  (c): c is Exclude<GarmentCategory, 'lehenga-choli'> => c !== 'lehenga-choli',
+  (c): c is TopLikeCategory => c !== 'lehenga-choli' && c !== 'pants',
 );
 
-type UploadCategory = Exclude<GarmentCategory, 'lehenga-choli'>;
+type UploadCategory = TopLikeCategory;
 
 /** Typical hem length per category — applied when the user changes the
  * category select, since length (not category) is what actually drives how
@@ -39,6 +43,8 @@ type UploadCategory = Exclude<GarmentCategory, 'lehenga-choli'>;
  * pipeline/anchorMapping.ts computeHem). Still editable afterward. */
 const CATEGORY_DEFAULT_LENGTH: Record<UploadCategory, HemLength> = {
   top: 'hip',
+  shirt: 'hip',
+  tshirt: 'hip',
   kurti: 'knee',
   dress: 'knee',
   saree: 'ankle',
@@ -84,7 +90,7 @@ interface Props {
 export function GarmentUpload({ onGarmentAdded }: Props) {
   const matting = useMatting();
   const [step, setStep] = useState<UploadStep>({ kind: 'closed' });
-  const [category, setCategory] = useState<Exclude<GarmentCategory, 'lehenga-choli'>>('top');
+  const [category, setCategory] = useState<TopLikeCategory>('top');
   const [sleeves, setSleeves] = useState<SleeveLength>('half');
   const [length, setLength] = useState<HemLength>('hip');
   const [error, setError] = useState<string | null>(null);

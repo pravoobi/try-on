@@ -7,7 +7,7 @@
  * of a shirt); lehenga-choli upload is out of scope.
  */
 import type { GarmentAnchors } from '@practics/tryon-core';
-import type { GarmentCategory, GarmentMeta } from './schema';
+import type { GarmentMeta, TopLikeCategory } from './schema';
 
 export interface StoredGarmentPiece {
   imageBlob: Blob;
@@ -16,7 +16,8 @@ export interface StoredGarmentPiece {
 
 export interface StoredUserGarment {
   id: string;
-  category: Exclude<GarmentCategory, 'lehenga-choli'>;
+  /** Uploads are top-like only — the 6-anchor upload flow can't annotate pants (see GarmentUpload.tsx). */
+  category: TopLikeCategory;
   front: StoredGarmentPiece;
   back?: StoredGarmentPiece;
   meta: GarmentMeta;

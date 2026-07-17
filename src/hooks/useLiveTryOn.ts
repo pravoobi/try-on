@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { config } from '../config';
-import { smoothKeypoints } from '@practics/tryon-core';
-import type { Keypoint, PipelineResult } from '@practics/tryon-core';
+import { OneEuroKeypointSmoother } from '@practics/tryon-core';
+import type { PipelineResult } from '@practics/tryon-core';
 import type { UsePipeline } from './usePipeline';
 
 export interface LiveFrame {
@@ -38,7 +38,7 @@ export function useLiveTryOn(
 
     let cancelled = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let prevKeypoints: Keypoint[] | null = null;
+    const smoother = new OneEuroKeypointSmoother(config.liveSmoothing);
     let lastTick: number | null = null;
     let emaFps = 0;
     const targetIntervalMs = 1000 / config.targetFps;
@@ -56,9 +56,18 @@ export function useLiveTryOn(
       try {
         if (videoEl.readyState >= 2) {
           // Two copies: the worker consumes (transfers) its input, so the
-          // original is kept here as the display frame.
+          // original is kept here as the display frame. The worker's copy is
+          // downscaled to config.webcam.inferenceMaxWidth — display and
+          // inference resolution are deliberately decoupled (see that
+          // field's doc comment), with keypoints scaled back up below.
           const original = await createImageBitmap(videoEl);
-          const copy = await createImageBitmap(original);
+          const scale = Math.min(1, config.webcam.inferenceMaxWidth / original.width);
+          const inferW = Math.max(1, Math.round(original.width * scale));
+          const inferH = Math.max(1, Math.round(original.height * scale));
+          const copy = await createImageBitmap(original, {
+            resizeWidth: inferW,
+            resizeHeight: inferH,
+          });
           const res = await pipeline.process(copy);
           if (cancelled) {
             original.close();
@@ -66,8 +75,18 @@ export function useLiveTryOn(
             return;
           }
 
-          prevKeypoints = smoothKeypoints(prevKeypoints, res.keypoints, config.smoothingAlpha);
-          const next: LiveFrame = { frame: original, result: { ...res, keypoints: prevKeypoints } };
+          // Back to display-frame pixel space: everything downstream
+          // (smoothing state, anchor mapping, gestures, orientation) sees
+          // one coordinate space — the display frame's.
+          const sx = original.width / inferW;
+          const sy = original.height / inferH;
+          const displayKeypoints =
+            sx === 1 && sy === 1
+              ? res.keypoints
+              : res.keypoints.map((kp) => ({ ...kp, x: kp.x * sx, y: kp.y * sy }));
+
+          const smoothed = smoother.apply(displayKeypoints, tickStart, original.width);
+          const next: LiveFrame = { frame: original, result: { ...res, keypoints: smoothed } };
           clear(latestRef.current);
           latestRef.current = next;
           setLatest(next);

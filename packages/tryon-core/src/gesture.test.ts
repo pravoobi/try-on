@@ -11,16 +11,25 @@ import type { Keypoint } from './types';
 const CONFIG: SwipeConfig = {
   minTravelFrac: 0.22,
   windowMs: 700,
-  minSamples: 5,
+  minSamples: 3,
+  minSpanMs: 250,
   cooldownMs: 900,
-  minKeypointScore: 0.3,
+  oppositeCooldownMs: 1600,
+  minKeypointScore: 0.2,
   verticalDominanceMargin: 1.3,
 };
 
 const FRAME_WIDTH = 640;
 
+/** Shoulder line for the default test skeleton — "up" only fires when the wrist ends above it. */
+const SHOULDER_Y = 350;
+
 function wristAt(name: 'left_wrist' | 'right_wrist', x: number, y: number, score = 0.9): Keypoint[] {
-  return [{ name, x, y, score }];
+  return [
+    { name, x, y, score },
+    { name: 'left_shoulder', x: 280, y: SHOULDER_Y, score: 0.9 },
+    { name: 'right_shoulder', x: 380, y: SHOULDER_Y, score: 0.9 },
+  ];
 }
 
 /** Feeds a sequence of (x, y) samples through the detector, returning the final state and any swipes seen along the way. */
@@ -93,6 +102,35 @@ describe('updateSwipeDetection', () => {
     expect(swipes.filter((s) => s !== null)).toEqual(['left']);
   });
 
+  it('regression: a hand LIFT ending below the shoulders never fires "up" (capture countdown)', () => {
+    // The lead-in to a real sideways swipe: hand rises from the side up to
+    // chest height — large monotonic vertical travel, but ending BELOW the
+    // shoulder line. At low live fps the horizontal part that follows often
+    // loses wrist tracking, so this lift was the entire judged window and
+    // started the photo countdown on a swipe meant to cycle garments.
+    const pts: [number, number][] = [620, 560, 500, 440, 400].map((y) => [X0, y]); // ends 400 > SHOULDER_Y 350
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 120);
+    expect(swipes.every((s) => s === null)).toBe(true);
+  });
+
+  it('the same upward motion ending above the shoulders does fire "up"', () => {
+    const pts: [number, number][] = [520, 460, 400, 340, 280].map((y) => [X0, y]); // ends 280 < SHOULDER_Y 350
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 120);
+    expect(swipes.filter((s) => s !== null)).toEqual(['up']);
+  });
+
+  it('does not offer "up" at all when no shoulder is confidently tracked', () => {
+    let state = INITIAL_SWIPE_STATE;
+    let t = 1000;
+    for (const y of [520, 460, 400, 340, 280]) {
+      const kps: Keypoint[] = [{ name: 'right_wrist', x: X0, y, score: 0.9 }];
+      const r = updateSwipeDetection(state, kps, FRAME_WIDTH, t, CONFIG);
+      state = r.state;
+      expect(r.swipe).toBeNull();
+      t += 120;
+    }
+  });
+
   it('lets a clearly-dominant vertical motion still win despite some horizontal drift', () => {
     const pts: [number, number][] = [
       [300, 400],
@@ -141,13 +179,30 @@ describe('updateSwipeDetection', () => {
   });
 
   it('does not fire before minSamples worth of tracking has accumulated', () => {
-    // Big jump in just 2 samples should NOT fire (minSamples=5).
+    // Big jump in just 2 samples should NOT fire (minSamples=3).
     const pts: [number, number][] = [
       [100, Y0],
       [300, Y0],
     ];
-    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 70);
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 300);
     expect(swipes.every((s) => s === null)).toBe(true);
+  });
+
+  it('does not fire when the motion spans less than minSpanMs, however large the travel', () => {
+    // Three samples 60ms apart = 120ms total span < 250ms — a glitch-speed
+    // "motion", not a human swipe, even though travel is far past threshold.
+    const pts: [number, number][] = [100, 250, 400].map((x) => [x, Y0]);
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 60);
+    expect(swipes.every((s) => s === null)).toBe(true);
+  });
+
+  it('fires at low sample rates (heavy-load live fps) once the motion spans minSpanMs', () => {
+    // Regression: minSamples used to be 5 in a 700ms window, which needs
+    // ≥7fps to ever be satisfiable — advanced-mode live runs slower than
+    // that, silently disabling gestures. 3 samples 333ms apart is ~3fps.
+    const pts: [number, number][] = [100, 240, 380].map((x) => [x, Y0]);
+    const { swipes } = feed(INITIAL_SWIPE_STATE, 'right_wrist', pts, 333);
+    expect(swipes.filter((s) => s !== null)).toEqual(['right']);
   });
 
   it('resets the buffer when the wrist drops below confidence, requiring a fresh continuous motion', () => {
@@ -179,17 +234,46 @@ describe('updateSwipeDetection', () => {
     expect(second.swipes.every((s) => s === null)).toBe(true);
   });
 
-  it('allows a new swipe once the cooldown has elapsed', () => {
+  it('allows a new same-direction swipe once the cooldown has elapsed', () => {
     let state = INITIAL_SWIPE_STATE;
     let t = 1000;
     const pts: [number, number][] = [100, 130, 160, 190, 220, 250, 280].map((x) => [x, Y0]);
     const first = feed(state, 'right_wrist', pts, 70, t);
+    expect(first.swipes.filter((s) => s !== null)).toEqual(['right']);
     state = first.state;
     t += 7 * 70;
 
-    const pts2: [number, number][] = [280, 250, 220, 190, 160, 130, 100].map((x) => [x, Y0]);
+    const pts2: [number, number][] = [100, 130, 160, 190, 220, 250, 280].map((x) => [x, Y0]);
     const second = feed(state, 'left_wrist', pts2, 70, t + CONFIG.cooldownMs + 10);
-    expect(second.swipes.filter((s) => s !== null)).toEqual(['left']);
+    expect(second.swipes.filter((s) => s !== null)).toEqual(['right']);
+  });
+
+  it('regression: the return stroke after a swipe does not fire the opposite swipe', () => {
+    // Swipe right, then bring the hand back left ~1s later — the return
+    // retraces the same travel monotonically in the opposite direction and
+    // used to fire a real "left", undoing the change the swipe just made
+    // (seen in the field as the garment ping-ponging in place while the
+    // swipe feedback flashed on every motion).
+    const rightPts: [number, number][] = [100, 130, 160, 190, 220, 250, 280].map((x) => [x, Y0]);
+    const first = feed(INITIAL_SWIPE_STATE, 'right_wrist', rightPts, 70, 1000); // fires 'right' ~t=1350
+    expect(first.swipes.filter((s) => s !== null)).toEqual(['right']);
+
+    const returnPts: [number, number][] = [280, 240, 200, 160, 120, 80].map((x) => [x, Y0]);
+    const returned = feed(first.state, 'right_wrist', returnPts, 100, 2350); // past cooldown, inside suppression
+    expect(returned.swipes.every((s) => s === null)).toBe(true);
+
+    // The NEXT intended swipe (same direction) still works.
+    const againPts: [number, number][] = [80, 120, 160, 200, 240, 280, 320].map((x) => [x, Y0]);
+    const again = feed(returned.state, 'right_wrist', againPts, 100, 3000);
+    expect(again.swipes.filter((s) => s !== null)).toEqual(['right']);
+  });
+
+  it('a deliberate direction reversal fires once oppositeCooldownMs has passed', () => {
+    const rightPts: [number, number][] = [100, 130, 160, 190, 220, 250, 280].map((x) => [x, Y0]);
+    const first = feed(INITIAL_SWIPE_STATE, 'right_wrist', rightPts, 70, 1000); // fires ~t=1350, suppression until ~2950
+    const leftPts: [number, number][] = [280, 240, 200, 160, 120, 80].map((x) => [x, Y0]);
+    const reversed = feed(first.state, 'right_wrist', leftPts, 100, 3100);
+    expect(reversed.swipes.filter((s) => s !== null)).toEqual(['left']);
   });
 
   it('tracks left and right wrists independently — an idle low-confidence wrist does not block the other', () => {
