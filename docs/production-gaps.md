@@ -27,8 +27,13 @@ priority of the embeddable widget below.
    config.photoMatting.maxDim before matting). Hair-strand-level edges
    confirmed. Live mode still uses the segmenter (MODNet too slow per
    frame).
-4. **Color harmonization** — match garment layer exposure/white balance to
-   the scene before compositing; cheap and large realism gain.
+4. ~~**Color harmonization**~~ — DONE 2026-07-18: tryon-core harmonize.ts
+   nudges each garment layer's exposure + color cast toward the
+   illumination measured on the person region (clamped, strength-blended;
+   GPU apply via brightness-filter + multiply + alpha-restore, live-mode
+   cheap). "match colors" checkbox is the A/B. When advanced shading runs,
+   only the cast applies (shading already does scene-driven exposure).
+   Tuning knobs in config.harmonize if the nudge needs to be stronger.
 5. **Pose/segmentation model upgrades** — MoveNet Thunder or BlazePose (33
    kps) for steadier anchors; photo-mode first (fps cost).
 6. **Advanced-mode passes on GPU** — shading/depth-occlusion are CPU canvas

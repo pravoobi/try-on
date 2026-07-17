@@ -35,6 +35,7 @@ const tryOnConfig: PartialTryOnConfig = {
   anchors: config.anchors,
   relighting: config.relighting,
   depthOcclusion: config.depthOcclusion,
+  harmonize: config.harmonize,
   warpGrid: config.warpGrid,
   armOcclusionRadiusFactor: config.armOcclusionRadiusFactor,
 };
@@ -91,6 +92,8 @@ interface Props {
    * debug view above isn't toggled on. An ImageBitmap in photo mode, an
    * OffscreenCanvas in live mode (see hooks/useLiveDepth.ts). */
   personDepthBitmap?: DepthMapSource | null;
+  /** Color harmonization toggle (see tryon-core harmonize.ts). */
+  harmonize?: boolean;
   onTryOnStatus?: (status: TryOnStatus | null) => void;
 }
 
@@ -102,7 +105,7 @@ interface Props {
  * effect, via mergeRefs below.
  */
 export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCanvas(
-  { image, result, showMask, showSkeleton, garment, depthBitmap, personDepthBitmap, onTryOnStatus }: Props,
+  { image, result, showMask, showSkeleton, garment, depthBitmap, personDepthBitmap, harmonize, onTryOnStatus }: Props,
   forwardedRef,
 ) {
   const ref = useRef<HTMLCanvasElement | null>(null);
@@ -162,6 +165,7 @@ export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCa
           personDepth: safePersonDepth,
           foreshortenFactor: safeGarment.foreshortenFactor,
           viewAlpha: safeGarment.viewAlpha,
+          harmonize,
           config: tryOnConfig,
         });
       } else {
@@ -179,6 +183,7 @@ export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCa
           lehengaNormal: safeGarment.lehengaNormal,
           foreshortenFactor: safeGarment.foreshortenFactor,
           viewAlpha: safeGarment.viewAlpha,
+          harmonize,
           config: tryOnConfig,
         });
       }
@@ -237,7 +242,7 @@ export const DebugCanvas = forwardRef<HTMLCanvasElement, Props>(function DebugCa
         }
       }
     }
-  }, [image, result, showMask, showSkeleton, garment, depthBitmap, personDepthBitmap, onTryOnStatus]);
+  }, [image, result, showMask, showSkeleton, garment, depthBitmap, personDepthBitmap, harmonize, onTryOnStatus]);
 
   return (
     <canvas

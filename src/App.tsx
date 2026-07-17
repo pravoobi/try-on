@@ -82,6 +82,8 @@ export default function App() {
   const [runError, setRunError] = useState<string | null>(null);
   const [showMask, setShowMask] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
+  /** Color harmonization toggle ("match colors") — on by default, the checkbox is the A/B demo. */
+  const [showHarmonize, setShowHarmonize] = useState(true);
   const [selectedTop, setSelectedTop] = useState<TopSlotGarment | null>(null);
   const [selectedBottom, setSelectedBottom] = useState<PantsGarment | null>(null);
   const [garmentImages, setGarmentImages] = useState<LoadedGarmentImages | null>(null);
@@ -899,6 +901,14 @@ export default function App() {
               />
               skeleton
             </label>
+            <label title="nudge the garment's exposure and color toward the scene's lighting">
+              <input
+                type="checkbox"
+                checked={showHarmonize}
+                onChange={(e) => setShowHarmonize(e.target.checked)}
+              />
+              match colors
+            </label>
           </div>
 
           <div className="controls">
@@ -1015,6 +1025,7 @@ export default function App() {
                   garment={garmentOverlay}
                   depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
                   personDepthBitmap={mode === 'photo' ? photoDepth : liveDepth.depth}
+                  harmonize={showHarmonize}
                   onTryOnStatus={setTryOnStatus}
                 />
               ) : (
@@ -1076,6 +1087,7 @@ export default function App() {
                   garment={garmentOverlay}
                   depthBitmap={null}
                   personDepthBitmap={liveDepth.depth}
+                  harmonize={showHarmonize}
                   onTryOnStatus={setTryOnStatus}
                 />
               ) : (

@@ -152,6 +152,27 @@ export const config = {
      */
     stanceScoreSoftBand: 0.15,
   },
+  /**
+   * Color harmonization (see tryon-core harmonize.ts): conservative,
+   * clamped nudges of each garment layer's exposure + color cast toward
+   * the illumination measured on the person region — matching the light,
+   * never repainting the garment. The "match colors" checkbox is the A/B
+   * toggle.
+   */
+  harmonize: {
+    /** Downsample size (px per side) for the scene/layer color readbacks. */
+    sampleSize: 48,
+    /** How far the garment's mean luma is pulled toward the person's (0 = off, 1 = full match). */
+    exposureStrength: 0.65,
+    /** How far each channel tilts toward the scene's chromatic balance — well below 1, the probe (skin + clothes) isn't gray. */
+    castStrength: 0.5,
+    /** Exposure gain clamps. */
+    minExposure: 0.7,
+    maxExposure: 1.25,
+    /** Per-channel cast gain clamps. */
+    minCast: 0.9,
+    maxCast: 1.12,
+  },
   /** TPS warp evaluation grid (see pipeline/warp.ts). */
   warpGrid: { cols: 16, rows: 24 },
   /** Arm-occlusion capsule radius, as a fraction of shoulder-to-shoulder width — fallback path used when no advanced-mode depth map is available (see compositor.ts). */

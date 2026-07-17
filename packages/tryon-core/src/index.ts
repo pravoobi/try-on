@@ -7,6 +7,7 @@ export * from './autoAnchor.js';
 export * from './compositor.js';
 export * from './garmentExtract.js';
 export * from './gesture.js';
+export * from './harmonize.js';
 export * from './letterbox.js';
 export * from './maskRender.js';
 export * from './normalMap.js';

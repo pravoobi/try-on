@@ -61,6 +61,21 @@ export interface RelightingConfig {
   aoMax: number;
 }
 
+export interface HarmonizeConfig {
+  /** Downsample size (px per side) for the scene/layer color readbacks. */
+  sampleSize: number;
+  /** How far the garment's mean luma is pulled toward the person region's (0 = off, 1 = full match). */
+  exposureStrength: number;
+  /** How far each channel tilts toward the scene's chromatic balance. Kept well below 1 — the probe (skin + existing clothes) isn't gray, so full strength would recolor the garment toward skin tone rather than matching the light. */
+  castStrength: number;
+  /** Clamps on the exposure gain — a garment never darkens/brightens past these no matter how extreme the scene. */
+  minExposure: number;
+  maxExposure: number;
+  /** Clamps on each per-channel cast gain. */
+  minCast: number;
+  maxCast: number;
+}
+
 export interface DepthOcclusionConfig {
   /** Scan bbox margin, as a fraction of the anchor bbox size — hands/hair typically extend past the torso anchors themselves. */
   bboxMarginFrac: number;
@@ -82,6 +97,7 @@ export interface TryOnConfig {
   anchors: AnchorConfig;
   relighting: RelightingConfig;
   depthOcclusion: DepthOcclusionConfig;
+  harmonize: HarmonizeConfig;
   /** TPS warp evaluation grid. */
   warpGrid: WarpGridOptions;
   /** Arm-occlusion capsule radius, as a fraction of shoulder-to-shoulder width — fallback path used when no depth map is available. */
@@ -122,6 +138,15 @@ export const DEFAULT_CONFIG: TryOnConfig = {
     softBandGray: 18,
     belowHipCutoffFrac: 0.2,
   },
+  harmonize: {
+    sampleSize: 48,
+    exposureStrength: 0.65,
+    castStrength: 0.5,
+    minExposure: 0.7,
+    maxExposure: 1.25,
+    minCast: 0.9,
+    maxCast: 1.12,
+  },
   warpGrid: { cols: 16, rows: 24 },
   armOcclusionRadiusFactor: 0.14,
 };
@@ -131,6 +156,7 @@ export interface PartialTryOnConfig {
   anchors?: Partial<AnchorConfig>;
   relighting?: Partial<RelightingConfig>;
   depthOcclusion?: Partial<DepthOcclusionConfig>;
+  harmonize?: Partial<HarmonizeConfig>;
   warpGrid?: WarpGridOptions;
   armOcclusionRadiusFactor?: number;
 }
@@ -142,6 +168,7 @@ export function resolveTryOnConfig(partial?: PartialTryOnConfig): TryOnConfig {
     anchors: { ...DEFAULT_CONFIG.anchors, ...partial?.anchors },
     relighting: { ...DEFAULT_CONFIG.relighting, ...partial?.relighting },
     depthOcclusion: { ...DEFAULT_CONFIG.depthOcclusion, ...partial?.depthOcclusion },
+    harmonize: { ...DEFAULT_CONFIG.harmonize, ...partial?.harmonize },
     warpGrid: partial?.warpGrid ?? DEFAULT_CONFIG.warpGrid,
     armOcclusionRadiusFactor: partial?.armOcclusionRadiusFactor ?? DEFAULT_CONFIG.armOcclusionRadiusFactor,
   };

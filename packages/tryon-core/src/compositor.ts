@@ -23,6 +23,7 @@ import {
   foreshortenAnchors,
 } from './anchorMapping.js';
 import { resolveTryOnConfig, type PartialTryOnConfig, type TryOnConfig } from './config.js';
+import { computeHarmonizeGains, estimateSceneColor, harmonizeLayer, measureLayerLuminance } from './harmonize.js';
 import { clipToMask, openMaskBelow, renderFeatheredMask } from './maskRender.js';
 import { applyGarmentShading, estimateLight, type ShadingBBox } from './relight.js';
 import {
@@ -72,6 +73,8 @@ export interface TryOnInput {
    * transparent through the unrenderable profile band. Undefined/1 = fully
    * opaque, matching today's behavior. */
   viewAlpha?: number;
+  /** See OutfitTryOnInput.harmonize. */
+  harmonize?: boolean;
   /** Tuning override for anchor placement, relighting, and depth occlusion — any subset of any section; omitted sections/fields fall back to DEFAULT_CONFIG (see config.ts). */
   config?: PartialTryOnConfig;
 }
@@ -117,6 +120,8 @@ export interface OutfitTryOnInput {
   foreshortenFactor?: number;
   /** See TryOnInput.viewAlpha (Phase A5) — applied to the whole outfit. */
   viewAlpha?: number;
+  /** Color harmonization (see harmonize.ts): nudges each piece's exposure and color cast toward the scene's illumination. Off by default. */
+  harmonize?: boolean;
   config?: PartialTryOnConfig;
 }
 
@@ -168,6 +173,22 @@ export function renderOutfitTryOn(ctx: Canvas2DContext, input: OutfitTryOnInput)
   let light: ReturnType<typeof estimateLight> | null = null;
   const getLight = () => (light ??= estimateLight(frame, maskBitmap, w, h, config.relighting));
 
+  // Scene color stats for harmonization — likewise computed once, shared by
+  // every piece. Per piece, exposure matching is skipped when normal-map
+  // shading already ran (applyGarmentShading's intensity is scene-driven —
+  // stacking both would double-apply exposure); the color cast still helps.
+  const sceneStats = input.harmonize ? estimateSceneColor(frame, maskBitmap, config.harmonize) : null;
+  const harmonizePiece = (layer: OffscreenCanvas, shaded: boolean): OffscreenCanvas => {
+    if (!sceneStats) return layer;
+    const gains = computeHarmonizeGains(
+      sceneStats,
+      measureLayerLuminance(layer, config.harmonize),
+      config.harmonize,
+      shaded ? 0 : undefined,
+    );
+    return harmonizeLayer(layer, gains);
+  };
+
   const feathered = renderFeatheredMask(maskBitmap, w, h);
   const layers: OffscreenCanvas[] = [];
 
@@ -180,6 +201,7 @@ export function renderOutfitTryOn(ctx: Canvas2DContext, input: OutfitTryOnInput)
       const bbox = toPixelBBox(expandBBox(bboxOfPoints(dst), config.relighting.bboxMarginFrac, w, h));
       layer = applyGarmentShading(layer, normalLayer, getLight(), bbox, w, h, config.relighting, input.personDepth);
     }
+    layer = harmonizePiece(layer, !!pants.normal);
     layers.push(clipToMask(layer, w, h, feathered));
   }
 
@@ -204,6 +226,7 @@ export function renderOutfitTryOn(ctx: Canvas2DContext, input: OutfitTryOnInput)
       top.hemLength === 'hip'
         ? feathered
         : openMaskBelow(feathered, waistY, skirtLen * 0.2, hemY + skirtLen * 0.03, skirtLen * 0.05);
+    layer = harmonizePiece(layer, !!top.normal);
     layers.push(clipToMask(layer, w, h, clipMask));
   }
 
@@ -246,6 +269,7 @@ export function renderTryOn(ctx: Canvas2DContext, input: TryOnInput): TryOnStatu
     personDepth: input.personDepth,
     foreshortenFactor: input.foreshortenFactor,
     viewAlpha: input.viewAlpha,
+    harmonize: input.harmonize,
     config: input.config,
   });
 }
@@ -271,6 +295,8 @@ export interface LehengaCholiTryOnInput {
   foreshortenFactor?: number;
   /** See TryOnInput.viewAlpha (Phase A5). */
   viewAlpha?: number;
+  /** See OutfitTryOnInput.harmonize — applied to the combined two-piece layer. */
+  harmonize?: boolean;
   /** See TryOnInput.config. */
   config?: PartialTryOnConfig;
 }
@@ -345,11 +371,28 @@ export function renderLehengaCholiTryOn(ctx: Canvas2DContext, input: LehengaChol
     }
   }
 
-  const combined = new OffscreenCanvas(w, h);
+  let combined = new OffscreenCanvas(w, h);
   const combinedCtx = combined.getContext('2d');
   if (!combinedCtx) throw new Error('renderLehengaCholiTryOn: no 2d context');
   combinedCtx.drawImage(shadedLehengaLayer, 0, 0);
   combinedCtx.drawImage(shadedCholiLayer, 0, 0);
+
+  if (input.harmonize) {
+    // One pass over the combined two-piece layer — both pieces sit in the
+    // same scene light. Exposure matching is skipped when shading already
+    // applied a scene-driven intensity (see renderOutfitTryOn's version).
+    const sceneStats = estimateSceneColor(frame, maskBitmap, config.harmonize);
+    if (sceneStats) {
+      const shaded = !!(input.choliNormal || input.lehengaNormal);
+      const gains = computeHarmonizeGains(
+        sceneStats,
+        measureLayerLuminance(combined, config.harmonize),
+        config.harmonize,
+        shaded ? 0 : undefined,
+      );
+      combined = harmonizeLayer(combined, gains);
+    }
+  }
 
   const feathered = renderFeatheredMask(maskBitmap, w, h);
   // The skirt hangs free below its waistband — open the clip there so it
@@ -399,6 +442,8 @@ export interface PantsTryOnInput {
   foreshortenFactor?: number;
   /** See TryOnInput.viewAlpha (Phase A5). */
   viewAlpha?: number;
+  /** See OutfitTryOnInput.harmonize. */
+  harmonize?: boolean;
   /** See TryOnInput.config. */
   config?: PartialTryOnConfig;
 }
@@ -431,6 +476,7 @@ export function renderPantsTryOn(ctx: Canvas2DContext, input: PantsTryOnInput): 
     personDepth: input.personDepth,
     foreshortenFactor: input.foreshortenFactor,
     viewAlpha: input.viewAlpha,
+    harmonize: input.harmonize,
     config: input.config,
   });
 }
