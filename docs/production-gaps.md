@@ -20,8 +20,13 @@ priority of the embeddable widget below.
    the procedural PNGs prove the pipeline but would undermine a merchant
    demo. Drop raws in `tools/raw-garments/`, run
    `tools/process-new-garments.mjs`, hand-check anchors (esp. puff sleeves).
-3. **Photo-mode matting** — run the already-shipped MODNet worker on the
-   person photo (one-shot) for crisp garment clip edges in stills.
+3. ~~**Photo-mode matting**~~ — DONE 2026-07-18: the matting worker gained a
+   'person' mode (matte only, no garment extraction), and photo mode swaps
+   the low-res segmenter mask for the MODNet matte once it lands
+   (progressive; rides the advanced-mode opt-in; photo downscaled to
+   config.photoMatting.maxDim before matting). Hair-strand-level edges
+   confirmed. Live mode still uses the segmenter (MODNet too slow per
+   frame).
 4. **Color harmonization** — match garment layer exposure/white balance to
    the scene before compositing; cheap and large realism gain.
 5. **Pose/segmentation model upgrades** — MoveNet Thunder or BlazePose (33

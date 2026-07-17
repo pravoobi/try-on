@@ -55,7 +55,7 @@ self.onmessage = (e: MessageEvent<MattingWorkerRequest>) => {
     if (msg.garmentExtractConfig) garmentExtractConfig = msg.garmentExtractConfig;
     queue = queue.then(() => init(msg.device));
   } else if (msg.type === 'process') {
-    queue = queue.then(() => process(msg.bitmap, msg.seq));
+    queue = queue.then(() => process(msg.bitmap, msg.seq, msg.mode ?? 'garment'));
   }
 };
 
@@ -85,7 +85,7 @@ async function init(device: MattingAccelerator): Promise<void> {
   }
 }
 
-async function process(bitmap: ImageBitmap, seq: number): Promise<void> {
+async function process(bitmap: ImageBitmap, seq: number, mode: 'garment' | 'person'): Promise<void> {
   try {
     if (!matter || !parser) throw new Error('matting models not initialized');
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
@@ -96,6 +96,16 @@ async function process(bitmap: ImageBitmap, seq: number): Promise<void> {
     const t0 = performance.now();
     const image = await RawImage.read(canvas);
     const matted = await matter(image); // RGBA, background already transparent
+
+    if (mode === 'person') {
+      // Plain person matte (see MattingProcessRequest.mode): no parsing, no
+      // extraction — the whole foreground person IS the desired result.
+      const personCanvas = matted.toCanvas();
+      const personBitmap = await createImageBitmap(personCanvas as unknown as ImageBitmapSource);
+      post({ type: 'result', seq, mattedBitmap: personBitmap, ms: performance.now() - t0 }, [personBitmap]);
+      return;
+    }
+
     const segments = await parser(image); // one binary mask per detected label
 
     const w = matted.width;

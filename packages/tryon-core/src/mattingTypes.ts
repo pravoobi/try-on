@@ -20,6 +20,15 @@ export interface MattingProcessRequest {
   /** Transferred, not cloned. The worker consumes (closes) it. */
   bitmap: ImageBitmap;
   seq: number;
+  /**
+   * 'garment' (default): the upload flow — matting plus clothes-parsing
+   * extraction, so a photo of someone WEARING the garment returns just the
+   * garment. 'person': plain MODNet matting only — the result's alpha is a
+   * high-quality PERSON matte, used to refine the low-res segmenter mask
+   * for photo-mode compositing. Extraction must not run there: it would
+   * strip the very person the mask is for.
+   */
+  mode?: 'garment' | 'person';
 }
 
 export type MattingWorkerRequest = MattingInitRequest | MattingProcessRequest;

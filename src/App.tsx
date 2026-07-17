@@ -11,6 +11,7 @@ import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
 import { useGestureSwipe } from './hooks/useGestureSwipe';
 import { useLiveDepth } from './hooks/useLiveDepth';
+import { useMatting } from './hooks/useMatting';
 import { useLiveTryOn } from './hooks/useLiveTryOn';
 import { usePipeline } from './hooks/usePipeline';
 import { useTorsoOrientation } from './hooks/useTorsoOrientation';
@@ -129,6 +130,58 @@ export default function App() {
   const [garmentNormals, setGarmentNormals] = useState<GarmentNormals | null>(null);
   const photoDepthRef = useRef<ImageBitmap | null>(null);
   const garmentDepthRef = useRef<ImageBitmap | null>(null);
+
+  // Photo-mode person matting (see docs/production-gaps.md): a MODNet matte
+  // replaces the low-res segmenter mask for crisp clip edges in stills —
+  // most visible around hair. Rides the advanced-mode opt-in so its worker
+  // (and one-time model download) only exists once "Enhance (3D)" is on.
+  // Deliberately a separate useMatting instance from GarmentUpload's: that
+  // one's lifecycle is tied to the upload dialog being open, and tearing it
+  // down on dialog close must not kill photo matting (the browser cache
+  // dedupes the model download between them).
+  const photoMatting = useMatting();
+  const advancedReady = advanced.status === 'ready';
+  const setPhotoMattingEnabled = photoMatting.setEnabled;
+  useEffect(() => {
+    setPhotoMattingEnabled(advancedReady);
+  }, [advancedReady, setPhotoMattingEnabled]);
+
+  const [personMatte, setPersonMatte] = useState<ImageBitmap | null>(null);
+  const personMatteRef = useRef<ImageBitmap | null>(null);
+  useEffect(() => {
+    if (mode !== 'photo' || !image || photoMatting.status !== 'ready') {
+      personMatteRef.current?.close();
+      personMatteRef.current = null;
+      setPersonMatte(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        // Downscale before matting (config.photoMatting.maxDim): MODNet's
+        // useful edge detail tops out well below photo resolution, and the
+        // matte gets upscaled + feathered at composite time regardless.
+        const scale = Math.min(1, config.photoMatting.maxDim / Math.max(image.width, image.height));
+        const copy = await createImageBitmap(image, {
+          resizeWidth: Math.max(1, Math.round(image.width * scale)),
+          resizeHeight: Math.max(1, Math.round(image.height * scale)),
+        });
+        const matte = await photoMatting.mattePerson(copy);
+        if (cancelled) {
+          matte.close();
+          return;
+        }
+        personMatteRef.current?.close();
+        personMatteRef.current = matte;
+        setPersonMatte(matte);
+      } catch {
+        // Best-effort refinement — the segmenter mask still composites fine.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, image, photoMatting.status, photoMatting.mattePerson]);
 
   // Live-mode orientation (Phase A5, see docs/plan-3d-garment-assets.md
   // §5.4.3) and throttled depth (§5.5) — both meaningful only while
@@ -667,7 +720,16 @@ export default function App() {
   ]);
 
   const displayImage = mode === 'live' ? (live.latest?.frame ?? null) : image;
-  const displayResult = mode === 'live' ? (live.latest?.result ?? null) : result;
+  // Photo results get their mask upgraded to the MODNet person matte once
+  // it lands (progressive: the segmenter mask composites immediately, edges
+  // sharpen a beat later). The matte was computed from a downscale of this
+  // same photo, so it can substitute directly — every mask consumer scales
+  // to frame size anyway.
+  const photoResult = useMemo((): PipelineResult | null => {
+    if (!result || !personMatte) return result;
+    return { ...result, maskBitmap: personMatte };
+  }, [result, personMatte]);
+  const displayResult = mode === 'live' ? (live.latest?.result ?? null) : photoResult;
 
   /** Both worn slots' ids, for the picker's multi-highlight. */
   const selectedIds = useMemo(

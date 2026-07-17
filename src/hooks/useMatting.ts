@@ -22,6 +22,13 @@ export interface UseMatting {
   error: string | null;
   /** Runs background removal on a bitmap. The bitmap is transferred (consumed). Rejects if not ready. */
   removeBackground: (bitmap: ImageBitmap) => Promise<ImageBitmap>;
+  /**
+   * Plain MODNet person matte (no garment extraction): the result's alpha
+   * channel is a high-quality person mask, for refining the low-res
+   * segmenter mask in photo-mode compositing. Transfers (consumes) the
+   * bitmap. Rejects if not ready.
+   */
+  mattePerson: (bitmap: ImageBitmap) => Promise<ImageBitmap>;
 }
 
 /**
@@ -110,7 +117,7 @@ export function useMatting(): UseMatting {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 
-  const removeBackground = useCallback((bitmap: ImageBitmap): Promise<ImageBitmap> => {
+  const request = useCallback((bitmap: ImageBitmap, mode: 'garment' | 'person'): Promise<ImageBitmap> => {
     const worker = workerRef.current;
     if (!worker) {
       bitmap.close();
@@ -119,10 +126,13 @@ export function useMatting(): UseMatting {
     const seq = ++seqRef.current;
     return new Promise<ImageBitmap>((resolve, reject) => {
       pendingRef.current.set(seq, { resolve, reject });
-      const req: MattingWorkerRequest = { type: 'process', bitmap, seq };
+      const req: MattingWorkerRequest = { type: 'process', bitmap, seq, mode };
       worker.postMessage(req, [bitmap]);
     });
   }, []);
 
-  return { enabled, setEnabled, status, progress, error, removeBackground };
+  const removeBackground = useCallback((bitmap: ImageBitmap) => request(bitmap, 'garment'), [request]);
+  const mattePerson = useCallback((bitmap: ImageBitmap) => request(bitmap, 'person'), [request]);
+
+  return { enabled, setEnabled, status, progress, error, removeBackground, mattePerson };
 }

@@ -56,6 +56,14 @@ export const config = {
   /** Debug overlay: mask tint opacity. */
   maskOpacity: 0.45,
   /**
+   * Photo-mode person matting (advanced mode only): the MODNet matte that
+   * replaces the low-res segmenter mask for crisp clip edges in stills.
+   * The photo is downscaled to this max dimension before matting — MODNet's
+   * useful edge detail tops out well below full photo resolution, and the
+   * matte is upscaled+feathered at composite time anyway.
+   */
+  photoMatting: { maxDim: 1024 },
+  /**
    * Worn-garment extraction for user uploads (see pipeline/garmentExtract.ts
    * and workers/matting.worker.ts): background removal alone keeps the whole
    * foreground person, so a photo of someone WEARING the garment needs the
