@@ -300,6 +300,23 @@ function buildTop({ W, H, color, sleeve, hemY, seed }) {
   // config.anchors.waistT's idea of where a waist sits).
   const waistY = Math.round(shoulderL[1] + (hemY - shoulderL[1]) * 0.62);
   const waistX = sideTopL[0] + ((hemL[0] - sideTopL[0]) * (waistY - underarmY)) / (hemY - underarmY);
+
+  // Sleeve anchors, straight off the drawn sleeve geometry: cuff = center
+  // of the sleeve's end-opening edge; elbow (long sleeves) = the sleeve's
+  // midline partway down, so the warped sleeve can bend with a bent arm.
+  const cuffShortL = [Math.round((82 + 172) / 2), Math.round((292 + 262) / 2)];
+  const cuffLongL = [Math.round((58 + 138) / 2), hemY - 30];
+  const elbowLongL = [104, Math.round(260 + (hemY - 30 - 260) * 0.47)];
+  const sleeveAnchors =
+    sleeve === 'short'
+      ? { cuffL: cuffShortL, cuffR: [W - cuffShortL[0], cuffShortL[1]] }
+      : {
+          elbowL: elbowLongL,
+          elbowR: [W - elbowLongL[0], elbowLongL[1]],
+          cuffL: cuffLongL,
+          cuffR: [W - cuffLongL[0], cuffLongL[1]],
+        };
+
   return {
     buf,
     anchors: {
@@ -309,6 +326,7 @@ function buildTop({ W, H, color, sleeve, hemY, seed }) {
       waistR: [W - Math.round(waistX), waistY],
       hemL: [hemL[0], hemY],
       hemR: [W - hemL[0], hemY],
+      ...sleeveAnchors,
     },
   };
 }

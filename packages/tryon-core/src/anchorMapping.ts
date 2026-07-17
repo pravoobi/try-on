@@ -7,7 +7,18 @@
  * independently-warped pieces meet with no gap.
  */
 import type { TryOnConfig } from './config.js';
-import type { BodyAnchors, HemLength, Keypoint, KeypointName, Point, SkirtAnchors } from './types.js';
+import {
+  ANCHOR_NAMES,
+  SLEEVE_ANCHOR_NAMES,
+  type BodyAnchors,
+  type GarmentAnchors,
+  type HemLength,
+  type Keypoint,
+  type KeypointName,
+  type Point,
+  type SkirtAnchors,
+  type SleeveLength,
+} from './types.js';
 
 function findKeypoint(keypoints: readonly Keypoint[], name: KeypointName): Keypoint | undefined {
   return keypoints.find((k) => k.name === name);
@@ -208,13 +219,54 @@ function computeFlaredHem(
 }
 
 /**
+ * Sleeve anchor targets for one arm (see types.ts SLEEVE_ANCHOR_NAMES): the
+ * sleeve's midline follows the arm's own joint centers — no outward
+ * widening, unlike torso anchors, since a sleeve wraps the arm rather than
+ * draping in front of it. Each target is emitted only when the joints it
+ * needs are confidently tracked; a missing target simply omits that TPS
+ * correspondence, so the sleeve degrades to today's photo-pose behavior
+ * rather than snapping to a garbage keypoint.
+ */
+function computeSleeveTargets(
+  keypoints: readonly Keypoint[],
+  side: 'left' | 'right',
+  sleeves: SleeveLength,
+  config: TryOnConfig,
+): { elbow?: Point; cuff?: Point } {
+  if (sleeves === 'sleeveless') return {};
+  const minScore = config.minKeypointScore;
+  const shoulder = findKeypoint(keypoints, `${side}_shoulder`);
+  const elbow = findKeypoint(keypoints, `${side}_elbow`);
+  if (!elbow || elbow.score < minScore) return {};
+
+  if (sleeves === 'half') {
+    if (!shoulder || shoulder.score < minScore) return {};
+    const t = config.anchors.sleeve.halfCuffT;
+    // Raw shoulder joint (not the widened/lifted torso anchor) — the sleeve
+    // runs down the arm's own centerline.
+    return { cuff: [lerp(shoulder.x, elbow.x, t), lerp(shoulder.y, elbow.y, t)] };
+  }
+
+  const wrist = findKeypoint(keypoints, `${side}_wrist`);
+  const out: { elbow?: Point; cuff?: Point } = { elbow: [elbow.x, elbow.y] };
+  if (wrist && wrist.score >= minScore) {
+    const t = config.anchors.sleeve.fullCuffT;
+    out.cuff = [lerp(elbow.x, wrist.x, t), lerp(elbow.y, wrist.y, t)];
+  }
+  return out;
+}
+
+/**
  * Computes the 6 body-space anchor targets, or null if the torso isn't
- * confidently visible enough to anchor a garment.
+ * confidently visible enough to anchor a garment. When `sleeves` is given
+ * (and not 'sleeveless'), also emits the optional per-arm sleeve targets a
+ * sleeve-annotated garment can pair with (see anchorCorrespondences).
  */
 export function computeBodyAnchors(
   keypoints: readonly Keypoint[],
   hemLength: HemLength,
   config: TryOnConfig,
+  sleeves?: SleeveLength,
 ): BodyAnchors | null {
   const ctx = computeTorsoContext(keypoints, config);
   if (!ctx) return null;
@@ -233,7 +285,67 @@ export function computeBodyAnchors(
     config,
   );
 
-  return { shoulderL: ctx.shoulderL, shoulderR: ctx.shoulderR, waistL, waistR, hemL, hemR };
+  const anchors: BodyAnchors = { shoulderL: ctx.shoulderL, shoulderR: ctx.shoulderR, waistL, waistR, hemL, hemR };
+  if (sleeves) {
+    const left = computeSleeveTargets(keypoints, 'left', sleeves, config);
+    const right = computeSleeveTargets(keypoints, 'right', sleeves, config);
+    if (left.elbow) anchors.elbowL = left.elbow;
+    if (left.cuff) anchors.cuffL = left.cuff;
+    if (right.elbow) anchors.elbowR = right.elbow;
+    if (right.cuff) anchors.cuffR = right.cuff;
+  }
+  return anchors;
+}
+
+/**
+ * Builds the TPS correspondence lists for a top-like garment: the 6
+ * required anchors always, plus each optional sleeve anchor present on
+ * BOTH sides of the mapping (annotated on the garment AND confidently
+ * computed on the body). Pairing is strictly by name — a garment cuff with
+ * no body cuff target (arm not tracked) contributes nothing.
+ */
+/**
+ * Where along shoulder→elbow the synthesized sleeve-cap pin sits (see
+ * anchorCorrespondences): high enough to hold the sleeve cap at the
+ * shoulder, low enough that the sleeve's rotation toward the tracked arm
+ * happens below it.
+ */
+const SLEEVE_CAP_PIN_T = 0.35;
+
+function lerpPoint(a: Point, b: Point, t: number): Point {
+  return [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+}
+
+export function anchorCorrespondences(
+  garment: GarmentAnchors,
+  body: BodyAnchors,
+): { src: Point[]; dst: Point[] } {
+  const src: Point[] = ANCHOR_NAMES.map((n) => garment[n]);
+  const dst: Point[] = ANCHOR_NAMES.map((n) => body[n]);
+  for (const n of SLEEVE_ANCHOR_NAMES) {
+    const g = garment[n];
+    const b = body[n];
+    if (g && b) {
+      src.push(g);
+      dst.push(b);
+    }
+  }
+  // Sleeve-cap pin: with only shoulder + elbow correspondences, a sleeve
+  // rotating from the photo pose toward the tracked arm smears that
+  // rotation up through the shoulder — the cap slides inward and opens a
+  // skin gap at the shoulder silhouette (seen as an accidental
+  // "cold-shoulder" cut). A synthesized pair partway down the upper sleeve
+  // pins the cap fabric to the upper arm, so the bend happens below it.
+  const capPin = (shoulder: 'shoulderL' | 'shoulderR', elbow: 'elbowL' | 'elbowR') => {
+    const gElbow = garment[elbow];
+    const bElbow = body[elbow];
+    if (!gElbow || !bElbow) return;
+    src.push(lerpPoint(garment[shoulder], gElbow, SLEEVE_CAP_PIN_T));
+    dst.push(lerpPoint(body[shoulder], bElbow, SLEEVE_CAP_PIN_T));
+  };
+  capPin('shoulderL', 'elbowL');
+  capPin('shoulderR', 'elbowR');
+  return { src, dst };
 }
 
 /**
@@ -322,6 +434,8 @@ const MIRROR_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['shoulderL', 'shoulderR'],
   ['waistL', 'waistR'],
   ['hemL', 'hemR'],
+  ['elbowL', 'elbowR'],
+  ['cuffL', 'cuffR'],
 ];
 
 /**
@@ -332,12 +446,12 @@ const MIRROR_PAIRS: ReadonlyArray<readonly [string, string]> = [
  * shoulder that anchors the front image's left side anchors the back
  * image's *right* side once you're looking at them from behind.
  */
-export function mirrorAnchorsLR<T extends Record<string, Point>>(anchors: T): T {
+export function mirrorAnchorsLR<T extends Partial<Record<string, Point>>>(anchors: T): T {
   const out = { ...anchors };
   for (const [a, b] of MIRROR_PAIRS) {
-    if (a in anchors && b in anchors) {
-      (out as Record<string, Point>)[a] = anchors[b];
-      (out as Record<string, Point>)[b] = anchors[a];
+    if (anchors[a] && anchors[b]) {
+      (out as Record<string, Point>)[a] = anchors[b]!;
+      (out as Record<string, Point>)[b] = anchors[a]!;
     }
   }
   return out;
@@ -351,13 +465,14 @@ export function mirrorAnchorsLR<T extends Record<string, Point>>(anchors: T): T 
  * and pipeline/orientation.ts's foreshortenFactor). y is untouched — only
  * yaw (rotation about the vertical spine axis) is modeled, not pitch/roll.
  */
-export function foreshortenAnchors<T extends Record<string, Point>>(anchors: T, factor: number): T {
-  const points = Object.values(anchors) as Point[];
+export function foreshortenAnchors<T extends Partial<Record<string, Point>>>(anchors: T, factor: number): T {
+  const points = Object.values(anchors).filter((p): p is Point => !!p);
   const centerX = points.reduce((sum, p) => sum + p[0], 0) / points.length;
   const out = { ...anchors } as Record<string, Point>;
   for (const key of Object.keys(anchors)) {
-    const [x, y] = anchors[key as keyof T] as Point;
-    out[key] = [centerX + (x - centerX) * factor, y];
+    const point = anchors[key as keyof T] as Point | undefined;
+    if (!point) continue;
+    out[key] = [centerX + (point[0] - centerX) * factor, point[1]];
   }
   return out as T;
 }

@@ -12,6 +12,7 @@ import {
   type PartialTryOnConfig,
   type PipelineResult,
   type SkirtAnchors,
+  type SleeveLength,
   tintMask,
   type TryOnStatus,
 } from '@practics/tryon-core';
@@ -46,6 +47,8 @@ export type GarmentOverlay =
         image: ImageBitmap;
         anchors: GarmentAnchors;
         hemLength: HemLength;
+        /** Enables arm-following sleeves when `anchors` carries sleeve anchors (see tryon-core SLEEVE_ANCHOR_NAMES). */
+        sleeves?: SleeveLength;
         /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
         normal?: OffscreenCanvas | null;
       } | null;

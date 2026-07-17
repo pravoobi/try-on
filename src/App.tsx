@@ -636,6 +636,7 @@ export default function App() {
         image: useBack ? garmentImages.backImage! : garmentImages.image,
         anchors: useBack ? mirrorAnchorsLR(selectedTop.back!.anchors) : selectedTop.anchors,
         hemLength: selectedTop.meta.length,
+        sleeves: selectedTop.meta.sleeves,
         normal: useBack
           ? (normals?.kind === 'single' ? normals.backNormal : null)
           : (normals?.kind === 'single' ? normals.normal : null),

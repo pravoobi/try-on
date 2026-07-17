@@ -16,6 +16,7 @@
  */
 import { renderGarmentWarp, type WarpGridOptions } from 'thin-plate-spline';
 import {
+  anchorCorrespondences,
   computeBodyAnchors,
   computeLehengaSkirtBodyAnchors,
   computePantsBodyAnchors,
@@ -34,6 +35,7 @@ import {
   type Keypoint,
   type Point,
   type SkirtAnchors,
+  type SleeveLength,
 } from './types.js';
 
 type Canvas2DContext = OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
@@ -45,6 +47,8 @@ export interface TryOnInput {
   garmentImage: CanvasImageSource & { width: number; height: number };
   garmentAnchors: GarmentAnchors;
   hemLength: HemLength;
+  /** See OutfitTopPiece.sleeves — enables arm-following sleeves for sleeve-annotated garments. */
+  sleeves?: SleeveLength;
   warpGrid?: WarpGridOptions;
   armOcclusion?: boolean;
   /** Fraction of shoulder-to-shoulder width used as the occlusion capsule radius (fallback path only). */
@@ -79,6 +83,12 @@ export interface OutfitTopPiece {
   image: CanvasImageSource & { width: number; height: number };
   anchors: GarmentAnchors;
   hemLength: HemLength;
+  /**
+   * Sleeve length — enables arm-following sleeves when `anchors` also
+   * carries the optional sleeve anchors (see types.ts SLEEVE_ANCHOR_NAMES).
+   * Omitted/'sleeveless' leaves sleeves in the product photo's pose.
+   */
+  sleeves?: SleeveLength;
   /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
   normal?: (CanvasImageSource & { width: number; height: number }) | null;
 }
@@ -142,7 +152,7 @@ export function renderOutfitTryOn(ctx: Canvas2DContext, input: OutfitTryOnInput)
   // either present piece can't anchor, neither can — one status covers all.
   let topBody: BodyAnchors | null = null;
   if (top) {
-    const raw = computeBodyAnchors(keypoints, top.hemLength, config);
+    const raw = computeBodyAnchors(keypoints, top.hemLength, config, top.sleeves);
     if (!raw) return 'pose-not-anchorable';
     topBody = foreshortenAnchors(raw, foreshorten);
   }
@@ -174,8 +184,7 @@ export function renderOutfitTryOn(ctx: Canvas2DContext, input: OutfitTryOnInput)
   }
 
   if (top && topBody) {
-    const src: Point[] = ANCHOR_NAMES.map((n) => top.anchors[n]);
-    const dst: Point[] = ANCHOR_NAMES.map((n) => topBody[n]);
+    const { src, dst } = anchorCorrespondences(top.anchors, topBody);
     let layer = renderGarmentWarp(top.image, src, dst, w, h, warpGrid);
     if (top.normal) {
       const normalLayer = renderGarmentWarp(top.normal, src, dst, w, h, warpGrid);
@@ -228,6 +237,7 @@ export function renderTryOn(ctx: Canvas2DContext, input: TryOnInput): TryOnStatu
       image: input.garmentImage,
       anchors: input.garmentAnchors,
       hemLength: input.hemLength,
+      sleeves: input.sleeves,
       normal: input.garmentNormal,
     },
     warpGrid: input.warpGrid,

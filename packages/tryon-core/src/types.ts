@@ -70,10 +70,28 @@ export const ANCHOR_NAMES = ['shoulderL', 'shoulderR', 'waistL', 'waistR', 'hemL
 
 export type AnchorName = (typeof ANCHOR_NAMES)[number];
 
-export type GarmentAnchors = Record<AnchorName, Point>;
+/**
+ * Optional sleeve anchors: without them, sleeves are dragged along by the
+ * torso anchors and stay frozen in the product photo's pose no matter what
+ * the wearer's arms do. When a garment annotates them — and the wearer's
+ * arm keypoints are confidently tracked — each becomes an extra TPS
+ * correspondence, so sleeves follow the arms (see anchorMapping.ts
+ * computeBodyAnchors's sleeve targets). `cuff` marks the CENTER of the
+ * sleeve's end opening (mid-bicep for half sleeves, at the wrist cuff for
+ * full); `elbow` (full sleeves only) marks the sleeve's midline at elbow
+ * height, letting the sleeve bend with a bent arm.
+ */
+export const SLEEVE_ANCHOR_NAMES = ['elbowL', 'cuffL', 'elbowR', 'cuffR'] as const;
+
+export type SleeveAnchorName = (typeof SLEEVE_ANCHOR_NAMES)[number];
+
+export type GarmentAnchors = Record<AnchorName, Point> & Partial<Record<SleeveAnchorName, Point>>;
 
 /** Same shape as GarmentAnchors, but in frame/body pixel space — the TPS warp target. */
 export type BodyAnchors = GarmentAnchors;
+
+/** How far a garment's sleeves reach (drives which arm joints the optional sleeve anchors map to). */
+export type SleeveLength = 'full' | 'half' | 'sleeveless';
 
 /**
  * A skirt (the lehenga half of a lehenga-choli) has no shoulders — only a

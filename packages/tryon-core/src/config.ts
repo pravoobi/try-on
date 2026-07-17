@@ -30,6 +30,13 @@ export interface AnchorConfig {
   stanceCoverMargin: number;
   /** Confidence band (above minKeypointScore) over which a leg joint's stance-cover constraint fades in, instead of popping the hem width at a hard threshold. */
   stanceScoreSoftBand: number;
+  /** Sleeve anchor targets (see types.ts SLEEVE_ANCHOR_NAMES): where along the arm the cuff target sits. */
+  sleeve: {
+    /** Half-sleeve cuff target, as a fraction of the way from the shoulder joint to the elbow. */
+    halfCuffT: number;
+    /** Full-sleeve cuff target, as a fraction of the way from the elbow to the wrist — slightly short of the wrist, where a real cuff sits. */
+    fullCuffT: number;
+  };
 }
 
 export interface RelightingConfig {
@@ -92,6 +99,7 @@ export const DEFAULT_CONFIG: TryOnConfig = {
     dressFlare: { hip: 1, knee: 1.2, ankle: 1.35 },
     stanceCoverMargin: 0.25,
     stanceScoreSoftBand: 0.15,
+    sleeve: { halfCuffT: 0.6, fullCuffT: 0.85 },
   },
   relighting: {
     bboxMarginFrac: 0.15,

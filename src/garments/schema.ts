@@ -12,6 +12,7 @@
 import {
   ANCHOR_NAMES,
   SKIRT_ANCHOR_NAMES,
+  SLEEVE_ANCHOR_NAMES,
   type AnchorName,
   type GarmentAnchors,
   type HemLength,
@@ -126,7 +127,17 @@ function validateAnchorSet<Name extends string>(
 }
 
 function validateAnchors(v: unknown, path: string): GarmentAnchors {
-  return validateAnchorSet<AnchorName>(v, ANCHOR_NAMES, path);
+  const anchors: GarmentAnchors = validateAnchorSet<AnchorName>(v, ANCHOR_NAMES, path);
+  // Optional sleeve anchors (see tryon-core SLEEVE_ANCHOR_NAMES): absent is
+  // fine (sleeves stay in the photo pose), but a present-yet-malformed one
+  // should fail loudly like any other anchor.
+  const obj = v as Record<string, unknown>;
+  for (const name of SLEEVE_ANCHOR_NAMES) {
+    if (obj[name] === undefined) continue;
+    if (!isPoint(obj[name])) fail(path, `anchors.${name} must be a [x, y] tuple of finite numbers`);
+    anchors[name] = obj[name];
+  }
+  return anchors;
 }
 
 function validateSkirtAnchors(v: unknown, path: string): SkirtAnchors {
