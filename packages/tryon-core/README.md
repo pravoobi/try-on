@@ -34,16 +34,22 @@ something you provide yourself).
 
 - **`Segmenter`** / **`PoseEstimator`** (`segmenter.ts`/`pose.ts`) — LiteRT.js
   model wrappers: person-confidence mask, 17-keypoint pose.
-- **`renderTryOn`** / **`renderLehengaCholiTryOn`** (`compositor.ts`) — the
-  whole per-frame render: warp the garment onto detected body anchors, clip
-  to the person mask, restore arm/hair pixels in front of the fabric.
-  Depth-tested occlusion and Lambertian relighting kick in automatically
-  when you pass a person depth map / garment normal map; otherwise it falls
-  back to a lighter heuristic (arm-capsule occlusion, flat shading).
-- **`computeBodyAnchors`** / **`computeLehengaSkirtBodyAnchors`**
-  (`anchorMapping.ts`) — maps pose keypoints to the 6 anchor targets a
-  garment's warp is fit to (shoulders direct, waist interpolated,
-  hem extrapolated per garment length).
+- **`renderOutfitTryOn`** (`compositor.ts`) — the general per-frame render:
+  an optional top piece (shirt/tshirt/kurti/dress) and/or an optional pants
+  piece composited in one pass — pants first, top over the waistband seam —
+  each warped onto detected body anchors and clipped to the person mask
+  (pants fitted everywhere; a knee/ankle top's hem drapes free), then
+  arm/hair pixels restored in front of the fabric. Depth-tested occlusion
+  and Lambertian relighting kick in automatically when you pass a person
+  depth map / garment normal maps; otherwise it falls back to a lighter
+  heuristic (arm-capsule occlusion, flat shading). **`renderTryOn`** /
+  **`renderPantsTryOn`** are single-piece conveniences over it;
+  **`renderLehengaCholiTryOn`** handles the two-piece lehenga ensemble.
+- **`computeBodyAnchors`** / **`computeLehengaSkirtBodyAnchors`** /
+  **`computePantsBodyAnchors`** (`anchorMapping.ts`) — maps pose keypoints
+  to the anchor targets a garment's warp is fit to (shoulders direct, waist
+  interpolated, hem extrapolated per garment length; pants hems track each
+  leg's own knee/ankle keypoint).
 - **`suggestAnchors`** / **`cropToAlphaBBox`** (`autoAnchor.ts`) — auto-suggests
   those same 6 anchors from a background-removed garment photo's alpha
   silhouette, for a garment-upload flow's starting point.
@@ -52,12 +58,17 @@ something you provide yourself).
   model's per-pixel labels, strips the wearer and keeps just the garment.
 - **`updateSwipeDetection`** (`gesture.ts`) — hands-free left/right/up/down
   swipe detection from wrist keypoints alone (no camera access beyond what
-  you already have for pose estimation).
+  you already have for pose estimation). Frame-rate independent (a swipe is
+  judged by real-time span, not sample count), with return-stroke
+  suppression (the hand traveling back doesn't fire the opposite swipe) and
+  an above-the-shoulders gate on "up".
 - **`estimateTorsoOrientation`** / **`selectGarmentView`** (`orientation.ts`)
   — live-mode yaw estimation (shoulder-width heuristic) and front/back/
   profile view selection + fade, for a garment with a back photo.
-- **`smoothKeypoints`** (`smoothing.ts`) — exponential smoothing across
-  frames to kill live-video jitter.
+- **`OneEuroKeypointSmoother`** (`smoothing.ts`) — One Euro filtering across
+  frames to kill live-video jitter: heavy smoothing at standstill, near-raw
+  during fast motion, stable across varying tick rates. (`smoothKeypoints`,
+  the simpler fixed-alpha EMA, is still exported.)
 - **`computeLetterbox`** / **`unletterboxPoint`** (`letterbox.ts`) — square
   model-input padding math, and mapping keypoints back out of it.
 - **`depthToNormalMap`** (`normalMap.ts`) — derives a normal map from a

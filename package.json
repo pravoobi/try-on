@@ -20,7 +20,7 @@
     "fetch-test-photos": "node tools/fetch-test-photos.mjs"
   },
   "dependencies": {
-    "@practics/tryon-core": "^0.1.0",
+    "@practics/tryon-core": "^0.2.0",
     "litert-react": "^0.1.0",
     "thin-plate-spline": "^0.1.0",
     "react": "^19.2.7",

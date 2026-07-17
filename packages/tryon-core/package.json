@@ -1,6 +1,6 @@
 {
   "name": "@practics/tryon-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Framework-free virtual try-on pipeline: person segmentation, pose estimation, TPS garment warp, and mask/depth-aware compositing — embeddable in any app, on-device, no server.",
   "type": "module",
   "main": "./dist/index.js",
