@@ -376,6 +376,12 @@ body {
   scrollbar-color: #374151 transparent;
 }
 
+/* The upload dialog is wider than the generic modal: the anchor editor and
+   the live try-on preview sit side by side (see .anchor-edit-row). */
+.modal-content.garment-upload {
+  max-width: 780px;
+}
+
 .modal-content::-webkit-scrollbar {
   width: 8px;
 }
@@ -490,6 +496,37 @@ main {
   border: 1px solid #374151;
   cursor: crosshair;
   touch-action: none;
+}
+
+/* Anchor editor + live try-on preview, side by side (wrapping on narrow
+   screens) — see GarmentUpload.tsx front-edit step. */
+.anchor-edit-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.anchor-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.anchor-preview canvas {
+  /* Display cap only — the canvas renders at the person photo's own
+     resolution (same pattern as .debug-canvas). */
+  max-width: 260px;
+  max-height: 420px;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid #374151;
+}
+
+.anchor-preview-hint {
+  max-width: 220px;
 }
 
 .garment-picker {

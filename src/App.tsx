@@ -1045,6 +1045,8 @@ export default function App() {
               const garment = await userGarments.addGarment(stored);
               selectGarment(garment, { toggle: false });
             }}
+            previewImage={mode === 'photo' ? image : null}
+            previewResult={mode === 'photo' ? photoResult : null}
           />
 
           <div className="garment-sidebar-list">

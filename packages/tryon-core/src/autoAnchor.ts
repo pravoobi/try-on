@@ -17,7 +17,7 @@
  * This is a starting point only — CLAUDE.md: "anchor quality dominates
  * output quality" — the drag-adjust UI is what actually makes these usable.
  */
-import type { GarmentAnchors, Point } from './types.js';
+import type { GarmentAnchors, Point, SkirtAnchors } from './types.js';
 
 export interface AlphaBBox {
   minX: number;
@@ -174,6 +174,76 @@ export function suggestAnchors(
   const hemR: Point = [hemR_x, hemY];
 
   return { shoulderL, shoulderR, waistL, waistR, hemL, hemR };
+}
+
+/**
+ * Suggests the 4-point pants anchor set (see schema/PantsGarment: waistband
+ * corners + each leg's OUTER bottom corner) from a matted pants photo's
+ * alpha silhouette, or null if the image is empty. Much simpler than the
+ * top heuristic: a pants photo starts at the waistband (top band extents)
+ * and ends at the leg openings (bottom band outer extents) — the inner-leg
+ * edges deliberately carry no anchors (see computePantsBodyAnchors).
+ */
+export function suggestPantsAnchors(
+  alphaData: Uint8ClampedArray,
+  w: number,
+  h: number,
+  options: SuggestAnchorsOptions = {},
+): SkirtAnchors | null {
+  const opts = { ...DEFAULTS, ...options };
+  const bbox = findAlphaBBox(alphaData, w, h, opts.alphaThreshold);
+  if (!bbox) return null;
+  const bboxH = bbox.maxY - bbox.minY;
+  if (bboxH <= 0) return null;
+  const rows = rowExtents(alphaData, w, h, opts.alphaThreshold);
+
+  // Waistband: WIDEST row within the top band (mirrors suggestAnchors's own
+  // shoulder detection — reuses shoulderBandFrac as "how far down to search
+  // from the top"), not a plain average of a fixed top slice. A garment that
+  // has already been through one matting pass (e.g. a catalog PNG re-run
+  // through the upload flow's own background removal) can pick up a faint,
+  // low-alpha wisp a row or two above the true opaque waistband edge — a
+  // plain top-slice average lets that thin artifact drag the whole waist
+  // width toward zero, collapsing the anchors into a near-vertical sliver.
+  // Searching for the widest row is immune to a thin outlier the same way
+  // the top heuristic already is for puff-sleeve bulges.
+  const waistBandEnd = Math.min(bbox.maxY, bbox.minY + Math.round(bboxH * opts.shoulderBandFrac));
+  let waistY = bbox.minY;
+  let waistWidth = -1;
+  for (let y = bbox.minY; y <= waistBandEnd; y++) {
+    const r = rows[y];
+    if (!r) continue;
+    const width = r[1] - r[0];
+    if (width > waistWidth) {
+      waistWidth = width;
+      waistY = y;
+    }
+  }
+  const waistRow = rows[waistY];
+  if (!waistRow) return null;
+
+  // Hem: average the bottom band's rows, robust against a single stray pixel.
+  const hemBandStart = Math.max(bbox.minY, bbox.maxY - Math.round(bboxH * opts.hemBandFrac));
+  let hemMinSum = 0;
+  let hemMaxSum = 0;
+  let hemCount = 0;
+  for (let y = hemBandStart; y <= bbox.maxY; y++) {
+    const r = rows[y];
+    if (!r) continue;
+    hemMinSum += r[0];
+    hemMaxSum += r[1];
+    hemCount++;
+  }
+  const hemY = bbox.maxY;
+  const hemL_x = hemCount > 0 ? hemMinSum / hemCount : waistRow[0];
+  const hemR_x = hemCount > 0 ? hemMaxSum / hemCount : waistRow[1];
+
+  return {
+    waistL: [waistRow[0], waistY],
+    waistR: [waistRow[1], waistY],
+    hemL: [hemL_x, hemY],
+    hemR: [hemR_x, hemY],
+  };
 }
 
 export interface CroppedBitmap {

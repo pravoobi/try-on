@@ -5,35 +5,46 @@ import {
   saveUserGarment,
   type StoredUserGarment,
 } from '../garments/userGarmentStore';
-import type { SinglePieceGarment } from '../garments/schema';
+import type { Garment } from '../garments/schema';
+import type { GarmentAnchors, SkirtAnchors } from '@practics/tryon-core';
 
 export type UserGarmentsStatus = 'loading' | 'ready' | 'error';
 
 export interface UseUserGarments {
-  garments: SinglePieceGarment[];
+  garments: Garment[];
   status: UserGarmentsStatus;
   error: string | null;
   /** Persists a new upload to IndexedDB, adds it to the in-memory list immediately (no reload needed), and returns it so the caller can e.g. auto-select it. */
-  addGarment: (stored: StoredUserGarment) => Promise<SinglePieceGarment>;
+  addGarment: (stored: StoredUserGarment) => Promise<Garment>;
   removeGarment: (id: string) => Promise<void>;
 }
 
-function storedToGarment(s: StoredUserGarment): SinglePieceGarment {
+function storedToGarment(s: StoredUserGarment): Garment {
+  if (s.category === 'pants') {
+    return {
+      id: s.id,
+      category: 'pants',
+      image: URL.createObjectURL(s.front.imageBlob),
+      anchors: s.front.anchors as SkirtAnchors,
+      meta: s.meta,
+    };
+  }
   return {
     id: s.id,
     category: s.category,
     image: URL.createObjectURL(s.front.imageBlob),
-    anchors: s.front.anchors,
+    anchors: s.front.anchors as GarmentAnchors,
     ...(s.back
-      ? { back: { image: URL.createObjectURL(s.back.imageBlob), anchors: s.back.anchors } }
+      ? { back: { image: URL.createObjectURL(s.back.imageBlob), anchors: s.back.anchors as GarmentAnchors } }
       : {}),
     meta: s.meta,
   };
 }
 
-function revokeGarmentUrls(g: SinglePieceGarment): void {
+function revokeGarmentUrls(g: Garment): void {
+  if (g.category === 'lehenga-choli') return; // uploads never produce these
   URL.revokeObjectURL(g.image);
-  if (g.back) URL.revokeObjectURL(g.back.image);
+  if (g.category !== 'pants' && g.back) URL.revokeObjectURL(g.back.image);
 }
 
 /**
@@ -44,10 +55,10 @@ function revokeGarmentUrls(g: SinglePieceGarment): void {
  * catalog garments (see assetUrl.ts) with no special-casing elsewhere.
  */
 export function useUserGarments(): UseUserGarments {
-  const [garments, setGarments] = useState<SinglePieceGarment[]>([]);
+  const [garments, setGarments] = useState<Garment[]>([]);
   const [status, setStatus] = useState<UserGarmentsStatus>('loading');
   const [error, setError] = useState<string | null>(null);
-  const garmentsRef = useRef<SinglePieceGarment[]>([]);
+  const garmentsRef = useRef<Garment[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +86,7 @@ export function useUserGarments(): UseUserGarments {
     };
   }, []);
 
-  const addGarment = useCallback(async (stored: StoredUserGarment): Promise<SinglePieceGarment> => {
+  const addGarment = useCallback(async (stored: StoredUserGarment): Promise<Garment> => {
     await saveUserGarment(stored);
     const garment = storedToGarment(stored);
     garmentsRef.current = [...garmentsRef.current, garment];

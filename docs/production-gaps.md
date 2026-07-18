@@ -44,6 +44,50 @@ priority of the embeddable widget below.
    (funded startups + Google in Search/Shopping). If merchants demand HD
    renders, resell a partner API as a pro add-on — never own the infra.
 
+## Self-serve garment pipeline (merchant onboarding path)
+
+Goal: a free merchant gets a decent result in ~15 minutes via the upload
+flow (`GarmentUpload.tsx`) alone — matting → auto-anchor → drag-correct →
+save, no engineering help needed.
+
+- ~~**Sleeve/pants annotation UI**~~ — DONE 2026-07-18: uploads now support
+  `pants` (new `suggestPantsAnchors` in tryon-core: waistband = widest row
+  in the top band, hems = each leg's outer bottom corner) alongside the
+  existing top-like categories, and top-like uploads get optional
+  elbow/cuff sleeve anchors (auto-placed off the shoulder anchors,
+  drag-correctable) when `sleeves` is full/half. `AnchorEditor` is now
+  generic over an arbitrary named-anchor set instead of hardcoded to the
+  6-point top shape. Lehenga-choli and back-photo sleeve anchors are still
+  out of scope (uploads don't produce lehenga-cholis at all; a back photo's
+  sleeve anchors aren't annotated). `tools/annotate.html` (the standalone,
+  no-build-step tool) is unaware of both sleeve and pants anchors — only
+  the in-app flow has them.
+- ~~**Render-while-you-drag preview**~~ — DONE 2026-07-18: `TryOnPreview.tsx`
+  composites the draft garment live onto whatever photo is loaded in
+  photo-mode, re-rendering as anchors move — this is the safety net for a
+  bad auto-suggestion, and it's been visually confirmed to update
+  correctly on drag. **Uses `setTimeout(fn, 0)` for the coalescing, not
+  `requestAnimationFrame`** — rAF is throttled/paused while a tab is
+  backgrounded per spec, which would silently freeze the preview if the
+  dialog loses tab focus mid-drag (discovered via this exact failure mode
+  in automated testing: the effect ran, but its rAF callback never fired
+  for image loaded from a non-visible tab).
+- **MODNet flat-lay matting quality (new gotcha, found 2026-07-18):** the
+  matting worker's model (`Xenova/modnet`) is a *portrait/person* matting
+  model, not a general product-photography one. On a real on-model photo
+  it should be in-distribution and reliable (matches its training data).
+  On a flat-lay pants photo tested this session it badly under-alpha'd the
+  waistband — confidence rose gradually and peaked near the ankle instead
+  of the hip, an inversion no geometric anchor heuristic can correct for,
+  since the input alpha itself misrepresents the garment. (The specific
+  test image was also procedurally flat-shaded with none of a real photo's
+  texture/lighting noise, which may itself confuse a matting model trained
+  on photographs — re-test with a REAL flat-lay photo before concluding
+  this is a hard blocker rather than a test-fixture artifact.) Until
+  re-verified: recommend on-model photos over flat-lay for pants uploads,
+  and treat the drag-correct UI as load-bearing for pants specifically, not
+  just a nice-to-have.
+
 ## Business model (decided 2026-07-18)
 
 Freemium widget SaaS. **Free: unlimited on-device try-on** — zero marginal
@@ -62,21 +106,23 @@ hosted widget service + Shopify app private.
   permission UX, model-asset CDN strategy, theming, a minimal JS API
   (`mount(el, {catalogUrl})`). The hosted half (embed delivery, merchant
   config, analytics collection, billing) lives in a PRIVATE repo.
-- **Mobile Safari support** — promoted from "testing gap" to LAUNCH
-  BLOCKER: most shoppers are on phones; the wasm fallback must be verified
-  usable on mid-range iPhones/Androids.
+- **Mobile Safari / iOS support** — promoted from "testing gap" to LAUNCH
+  BLOCKER: most shoppers are on phones; WebGPU availability is the risk,
+  and the wasm fallback must be verified actually usable on mid-range
+  iPhones/Androids. No mobile-device test pass has been done yet.
 - **Catalog ingestion at scale** — flood-fill bg removal + hand-checked
   anchors won't survive hundreds of SKUs; needs an automated pipeline with
-  a human QA step (and sleeve-anchor auto-suggestion; upload flow still
-  can't annotate sleeves or pants).
-- **iOS/Safari coverage** — WebGPU availability is the risk; wasm fallback
-  needs real mid-range-phone testing. No mobile-device test pass has been
-  done.
+  a human QA step. (Sleeve/pants auto-suggestion now exists — see above —
+  but scaling to hundreds of SKUs unattended is still unproven.)
 - **Conversion analytics** — try-on engagement → add-to-cart lift is the
   sales pitch; needs event hooks in the widget (privacy-preserving,
   on-device stance intact).
 - **Sizing** — no size recommendation exists; separate problem (fit tech).
   Do not imply fit in merchant-facing copy until this exists.
-- **Lehenga-choli sleeve anchors + pants uploads** — choli pieces don't get
-  sleeve targets yet; the upload flow is top-like only.
-- **tools/annotate.html** — not yet aware of sleeve or pants anchors.
+- **Lehenga-choli uploads** — the upload flow only ever produces top-like
+  or pants garments; a two-piece lehenga-choli ensemble can't be uploaded
+  (would need its own two-photo flow, mirroring the catalog's manual
+  authoring today).
+- **tools/annotate.html** — the standalone, no-build-step annotation tool
+  is unaware of sleeve or pants anchors; only the in-app upload flow has
+  them. Low priority unless that tool becomes part of a batch pipeline.

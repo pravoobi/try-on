@@ -6,18 +6,19 @@
  * useUserGarments.ts). Uploads are single-piece only for v1 (a phone photo
  * of a shirt); lehenga-choli upload is out of scope.
  */
-import type { GarmentAnchors } from '@practics/tryon-core';
+import type { GarmentAnchors, SkirtAnchors } from '@practics/tryon-core';
 import type { GarmentMeta, TopLikeCategory } from './schema';
 
 export interface StoredGarmentPiece {
   imageBlob: Blob;
-  anchors: GarmentAnchors;
+  /** GarmentAnchors (with optional sleeve anchors) for top-like categories; SkirtAnchors for pants — narrowed by `category` at load (see useUserGarments.storedToGarment). */
+  anchors: GarmentAnchors | SkirtAnchors;
 }
 
 export interface StoredUserGarment {
   id: string;
-  /** Uploads are top-like only — the 6-anchor upload flow can't annotate pants (see GarmentUpload.tsx). */
-  category: TopLikeCategory;
+  /** Top-like categories or pants; lehenga-choli uploads don't exist. Pants never carry a `back` piece. */
+  category: TopLikeCategory | 'pants';
   front: StoredGarmentPiece;
   back?: StoredGarmentPiece;
   meta: GarmentMeta;

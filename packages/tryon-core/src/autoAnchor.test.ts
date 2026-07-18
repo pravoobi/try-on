@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findAlphaBBox, suggestAnchors } from './autoAnchor';
+import { findAlphaBBox, suggestAnchors, suggestPantsAnchors } from './autoAnchor';
 
 const W = 100;
 const H = 200;
@@ -90,5 +90,64 @@ describe('suggestAnchors', () => {
   it('returns null for an empty image', () => {
     const data = new Uint8ClampedArray(W * H * 4);
     expect(suggestAnchors(data, W, H)).toBeNull();
+  });
+});
+
+describe('suggestPantsAnchors', () => {
+  it('places the waistband at the top extents and the hems at the outer leg corners', () => {
+    // Pants silhouette: waistband (rows 20-40, width 60), then two legs
+    // (rows 41-179) with a gap between them.
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let y = 20; y < 180; y++) {
+      if (y <= 40) {
+        for (let x = 20; x <= 80; x++) data[(y * W + x) * 4 + 3] = 255;
+      } else {
+        for (let x = 20; x <= 44; x++) data[(y * W + x) * 4 + 3] = 255; // left leg
+        for (let x = 56; x <= 80; x++) data[(y * W + x) * 4 + 3] = 255; // right leg
+      }
+    }
+    const anchors = suggestPantsAnchors(data, W, H);
+    expect(anchors).not.toBeNull();
+    const { waistL, waistR, hemL, hemR } = anchors!;
+    expect(waistL[0]).toBeCloseTo(20, 0);
+    expect(waistR[0]).toBeCloseTo(80, 0);
+    expect(waistL[1]).toBeLessThan(45);
+    expect(hemL[0]).toBeCloseTo(20, 0); // OUTER corner of the left leg
+    expect(hemR[0]).toBeCloseTo(80, 0);
+    expect(hemL[1]).toBe(179);
+  });
+
+  it('returns null for an empty image', () => {
+    const data = new Uint8ClampedArray(W * H * 4);
+    expect(suggestPantsAnchors(data, W, H)).toBeNull();
+  });
+
+  it('regression: a thin artifact row above the true waistband does not collapse the waist width', () => {
+    // A garment re-run through matting (e.g. a catalog PNG uploaded back
+    // through the upload flow) can pick up a faint few-pixel-wide wisp just
+    // above the real opaque waistband edge. Averaging a fixed top slice let
+    // that wisp drag waistL/waistR to near-identical x values (observed live
+    // as a jeans photo warping into a vertical sliver); the widest-row
+    // search must skip past it to the real waistband.
+    const data = new Uint8ClampedArray(W * H * 4);
+    // Wisp: rows 20-21, a 2px sliver near center (x=49-50).
+    for (let y = 20; y <= 21; y++) {
+      data[(y * W + 49) * 4 + 3] = 255;
+      data[(y * W + 50) * 4 + 3] = 255;
+    }
+    // Real waistband: rows 22-40, full width (20-80).
+    for (let y = 22; y <= 40; y++) {
+      for (let x = 20; x <= 80; x++) data[(y * W + x) * 4 + 3] = 255;
+    }
+    // Legs below.
+    for (let y = 41; y < 180; y++) {
+      for (let x = 20; x <= 44; x++) data[(y * W + x) * 4 + 3] = 255;
+      for (let x = 56; x <= 80; x++) data[(y * W + x) * 4 + 3] = 255;
+    }
+    const anchors = suggestPantsAnchors(data, W, H);
+    expect(anchors).not.toBeNull();
+    const { waistL, waistR } = anchors!;
+    expect(waistR[0] - waistL[0]).toBeGreaterThan(50); // real waistband width, not the ~1px wisp
+    expect(waistL[1]).toBeGreaterThanOrEqual(22); // landed on the real band, not the wisp rows
   });
 });

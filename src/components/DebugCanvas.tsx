@@ -30,7 +30,7 @@ function isDetached(source: { width: number } | null | undefined): boolean {
  * src/config.ts, which happens to hold identical values today but would
  * silently stop tracking any future edit to src/config.ts's tuning.
  */
-const tryOnConfig: PartialTryOnConfig = {
+export const tryOnConfig: PartialTryOnConfig = {
   minKeypointScore: config.minKeypointScore,
   anchors: config.anchors,
   relighting: config.relighting,
