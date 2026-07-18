@@ -94,6 +94,17 @@ export type BodyAnchors = GarmentAnchors;
 export type SleeveLength = 'full' | 'half' | 'sleeveless';
 
 /**
+ * How dramatically a single-piece garment's hem flares away from the hips.
+ * 'dress' is the subtle default (a fitted dress hangs barely wider than the
+ * hips); 'skirt' is the lehenga/ghagra flare, several times the hip width.
+ * A lehenga-choli photographed as ONE image (the way real product
+ * photography almost always presents it) renders through the single-piece
+ * path but needs the skirt's flare, or the TPS folds the garment image's
+ * own wide hem into a hip-width target.
+ */
+export type HemFlare = 'dress' | 'skirt';
+
+/**
  * A skirt (the lehenga half of a lehenga-choli) has no shoulders — only a
  * waistband and a hem. Kept distinct from GarmentAnchors rather than faking
  * degenerate shoulder points through the 6-anchor shape.

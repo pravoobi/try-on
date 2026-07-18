@@ -5,6 +5,12 @@ dist/
 CLAUDE.md
 .claude/
 
+# generated review artifacts — regenerate with the tools that emit them
+# (extract-worn-garments.mjs / garment-contact-sheet.mjs). The cutout PNGs
+# they produce in public/garments/ ARE tracked; these intermediates aren't.
+tools/extracted-garments.json
+tools/contact-sheet.png
+
 # fetched binaries — re-fetch with `npm run fetch-models`
 public/models/*.tflite
 # synced from node_modules by tools/copy-litert-wasm.mjs

@@ -16,10 +16,32 @@ priority of the embeddable widget below.
    knobs are `SLEEVE_CAP_PIN_T` and per-garment elbow anchor placement.
    Sleeve anchors exist on the generated tees/shirt and the kurti; the
    upload flow and annotate tool can't place them yet.
-2. **Real product photography** for the shirt/tshirt/pants catalog entries —
-   the procedural PNGs prove the pipeline but would undermine a merchant
-   demo. Drop raws in `tools/raw-garments/`, run
-   `tools/process-new-garments.mjs`, hand-check anchors (esp. puff sleeves).
+2. ~~**Real product photography**~~ — DONE 2026-07-18: 17 real garments
+   ingested (8 trousers, 3 shorts, 2 shirts, 1 tee, 4 kurtis), the 6
+   procedural placeholders deleted. Catalog is now 21 real garments.
+
+   **Which tool to use:** `tools/extract-worn-garments.mjs` for ON-MODEL
+   photos (runs MODNet + SegFormer in Node and strips the wearer);
+   `tools/process-new-garments.mjs` only for flat-lay/hanger shots (flood-fill
+   background key, no person removal — a worn photo survives the key intact).
+   Review every batch with `tools/garment-contact-sheet.mjs`, which
+   composites cutouts over magenta with anchor dots: a cutout reviewed on
+   white or a light checkerboard hides precisely the failures worth finding.
+
+   **Photo requirements learned the hard way** — 9 of 26 were unusable:
+   - **Arms away from the garment.** Hands on hips or in pockets get
+     labelled `Left-arm`/`Right-arm` and subtracted, biting notches out of
+     the silhouette. Interior holes are auto-filled now, but damage that
+     touches the image border can't be (it isn't enclosed), which is what
+     wrecked `shorts-black-high-rise`, `shirt-striped-casual` and
+     `tshirt-polo-collared`.
+   - **Hair off the shoulders.** Long hair falling over a shoulder is
+     labelled `Hair` and removed the same way.
+   - **Whole garment in frame**, hem included (`lehnga-choli-yellow` was
+     cropped at the skirt hem, so there was no hem to anchor).
+   - **No dupatta / draped scarf** on lehengas — 2D TPS cannot warp drape
+     (same reason sarees are deferred); it smears when warped.
+   - Straight-on beats angled; plain background beats a styled set.
 3. ~~**Photo-mode matting**~~ — DONE 2026-07-18: the matting worker gained a
    'person' mode (matte only, no garment extraction), and photo mode swaps
    the low-res segmenter mask for the MODNet matte once it lands

@@ -63,12 +63,37 @@ export interface SinglePieceGarment {
   meta: GarmentMeta;
 }
 
+/**
+ * A lehenga-choli photographed as TWO separate pieces (choli top, lehenga
+ * skirt), composited independently so the skirt flares on its own anchors.
+ * Rare in practice — see SingleImageLehengaGarment for the shape real
+ * product photography actually ships.
+ */
 export interface LehengaCholiGarment {
   id: string;
   category: 'lehenga-choli';
   choli: GarmentPiece;
   /** meta.length describes the LEHENGA's hem (knee/ankle) — the choli's own hem is always the natural waistline. */
   lehenga: LehengaSkirtPiece;
+  meta: GarmentMeta;
+}
+
+/**
+ * A lehenga-choli shot as ONE image — choli and skirt together on a model,
+ * which is how essentially all real lehenga product photography presents
+ * it. Renders through the ordinary single-piece 6-anchor path, but with
+ * the skirt's dramatic hem flare (see tryon-core HemFlare) rather than a
+ * fitted dress's, so the garment's own wide hem maps to a correspondingly
+ * wide target instead of being folded into hip width.
+ *
+ * Distinguished from the two-piece shape by carrying `image` rather than
+ * `choli`/`lehenga`.
+ */
+export interface SingleImageLehengaGarment {
+  id: string;
+  category: 'lehenga-choli';
+  image: string;
+  anchors: GarmentAnchors;
   meta: GarmentMeta;
 }
 
@@ -89,7 +114,16 @@ export interface PantsGarment {
   meta: GarmentMeta;
 }
 
-export type Garment = SinglePieceGarment | LehengaCholiGarment | PantsGarment;
+export type Garment =
+  | SinglePieceGarment
+  | LehengaCholiGarment
+  | SingleImageLehengaGarment
+  | PantsGarment;
+
+/** Narrows the two lehenga-choli shapes (see SingleImageLehengaGarment). */
+export function isTwoPieceLehenga(g: Garment): g is LehengaCholiGarment {
+  return g.category === 'lehenga-choli' && 'choli' in g;
+}
 
 class GarmentValidationError extends Error {}
 
@@ -192,11 +226,22 @@ export function validateGarment(data: unknown, index?: number): Garment {
   const meta = validateMeta(obj.meta, `${path}.meta`);
 
   if (obj.category === 'lehenga-choli') {
+    // Two shapes share this category: separate choli/lehenga pieces, or the
+    // single on-model image real product photography actually ships.
+    if (obj.choli !== undefined || obj.lehenga !== undefined) {
+      return {
+        id: obj.id,
+        category: 'lehenga-choli',
+        choli: validatePiece(obj.choli, `${path}.choli`),
+        lehenga: validateSkirtPiece(obj.lehenga, `${path}.lehenga`),
+        meta,
+      };
+    }
     return {
       id: obj.id,
       category: 'lehenga-choli',
-      choli: validatePiece(obj.choli, `${path}.choli`),
-      lehenga: validateSkirtPiece(obj.lehenga, `${path}.lehenga`),
+      image: validateImagePath(obj.image, `${path}.image`),
+      anchors: validateAnchors(obj.anchors, `${path}.anchors`),
       meta,
     };
   }

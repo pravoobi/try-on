@@ -12,6 +12,7 @@ import {
   SLEEVE_ANCHOR_NAMES,
   type BodyAnchors,
   type GarmentAnchors,
+  type HemFlare,
   type HemLength,
   type Keypoint,
   type KeypointName,
@@ -267,6 +268,7 @@ export function computeBodyAnchors(
   hemLength: HemLength,
   config: TryOnConfig,
   sleeves?: SleeveLength,
+  hemFlare: HemFlare = 'dress',
 ): BodyAnchors | null {
   const ctx = computeTorsoContext(keypoints, config);
   if (!ctx) return null;
@@ -275,11 +277,12 @@ export function computeBodyAnchors(
   const waistL: Point = [lerp(ctx.shoulderL[0], ctx.hipL[0], t), lerp(ctx.shoulderL[1], ctx.hipL[1], t)];
   const waistR: Point = [lerp(ctx.shoulderR[0], ctx.hipR[0], t), lerp(ctx.shoulderR[1], ctx.hipR[1], t)];
 
+  const flareTable = hemFlare === 'skirt' ? config.anchors.skirtFlare : config.anchors.dressFlare;
   const [hemL, hemR] = computeFlaredHem(
     keypoints,
     hemLength,
     ctx,
-    config.anchors.dressFlare[hemLength],
+    flareTable[hemLength],
     waistL,
     waistR,
     config,

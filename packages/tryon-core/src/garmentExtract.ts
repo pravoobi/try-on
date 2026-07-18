@@ -33,10 +33,21 @@ export interface LabelMask {
   maskData: Uint8ClampedArray;
 }
 
+/**
+ * Which half of a worn outfit to keep. An on-model photo almost always
+ * contains BOTH an upper and a lower garment (a trousers product shot has
+ * the model's shirt in frame too), so the caller must say which one the
+ * photo is being ingested as — picking the largest garment class would
+ * extract the shirt from a trousers photo about as often as not.
+ */
+export type GarmentTarget = 'upper' | 'lower';
+
 export interface GarmentExtractOptions {
   humanPresenceFrac: number;
   minGarmentFrac: number;
   maskBlurPx: number;
+  /** Defaults to 'upper' — the historical behavior, and what the tops/kurtis/dresses upload path wants. */
+  target?: GarmentTarget;
 }
 
 export type GarmentExtractResult =
@@ -58,13 +69,79 @@ const HUMAN_PART_LABELS: readonly string[] = [
   'Right-arm',
 ];
 
-/** Candidate primary garments — matches the app's uploadable categories (tops/kurtis/dresses). */
-const GARMENT_PRIMARY_LABELS: readonly string[] = ['Upper-clothes', 'Dress'];
+/**
+ * Candidate primary garment classes per target, and the secondary classes
+ * kept alongside so they don't punch holes through the garment they sit on
+ * (a belt worn over a kurti, a scarf over a top, a belt at a trouser
+ * waistband). Only ONE primary is kept — the largest present — so a
+ * t-shirt-plus-jeans photo yields one asset, not a fused blob.
+ */
+const PRIMARY_LABELS: Record<GarmentTarget, readonly string[]> = {
+  upper: ['Upper-clothes', 'Dress'],
+  lower: ['Pants', 'Skirt'],
+};
 
-/** Kept along with the primary so they don't leave holes through the garment they sit on. */
-const GARMENT_EXTRA_LABELS: readonly string[] = ['Belt', 'Scarf'];
+const EXTRA_LABELS: Record<GarmentTarget, readonly string[]> = {
+  upper: ['Belt', 'Scarf'],
+  lower: ['Belt'],
+};
 
 const OPAQUE_THRESHOLD = 127;
+
+/**
+ * Fills interior holes in a binary garment mask: any non-garment pixel that
+ * can't reach the image border through other non-garment pixels is enclosed
+ * BY the garment, so it belongs to the garment.
+ *
+ * This matters because the parser labels whatever visually occludes the
+ * fabric — hair falling over a shoulder, a hand in a pocket, a bag strap —
+ * as its own class, and those pixels are then subtracted, punching holes
+ * clean through the cutout (observed: a striped shirt lost most of one
+ * shoulder to a "Hair" region, a polo lost chunks to "Left-arm"). The
+ * garment physically continues behind the occluder, so the silhouette
+ * should too.
+ *
+ * Connectivity, not a morphological close, is what makes this safe for the
+ * shapes that legitimately have gaps: the space between two trouser legs
+ * opens downward to the hem and reaches the border, so it survives; a
+ * fully-enclosed keyhole neckline would be filled, which is the accepted
+ * trade (rare, and far less damaging than a hole through a shoulder).
+ * Same reasoning as the background flood fill in tools/process-new-garments.mjs.
+ */
+function fillEnclosedHoles(mask: Uint8ClampedArray, w: number, h: number): void {
+  const n = w * h;
+  const reachable = new Uint8Array(n);
+  const stack = new Int32Array(n);
+  let sp = 0;
+
+  const seed = (idx: number) => {
+    if (reachable[idx] || mask[idx] > OPAQUE_THRESHOLD) return;
+    reachable[idx] = 1;
+    stack[sp++] = idx;
+  };
+  for (let x = 0; x < w; x++) {
+    seed(x);
+    seed((h - 1) * w + x);
+  }
+  for (let y = 0; y < h; y++) {
+    seed(y * w);
+    seed(y * w + w - 1);
+  }
+
+  while (sp > 0) {
+    const idx = stack[--sp];
+    const x = idx % w;
+    const y = (idx - x) / w;
+    if (x > 0) seed(idx - 1);
+    if (x < w - 1) seed(idx + 1);
+    if (y > 0) seed(idx - w);
+    if (y < h - 1) seed(idx + w);
+  }
+
+  for (let i = 0; i < n; i++) {
+    if (!reachable[i] && mask[i] <= OPAQUE_THRESHOLD) mask[i] = 255;
+  }
+}
 
 function countOpaque(data: Uint8ClampedArray): number {
   let n = 0;
@@ -141,9 +218,10 @@ export function extractGarmentAlpha(
   }
   if (humanArea / foregroundArea < options.humanPresenceFrac) return { kind: 'no-person' };
 
+  const target = options.target ?? 'upper';
   let primaryMask: Uint8ClampedArray | null = null;
   let primaryArea = 0;
-  for (const label of GARMENT_PRIMARY_LABELS) {
+  for (const label of PRIMARY_LABELS[target]) {
     const mask = byLabel.get(label);
     if (!mask) continue;
     const area = countOpaque(mask);
@@ -157,13 +235,14 @@ export function extractGarmentAlpha(
   }
 
   const combined = new Uint8ClampedArray(primaryMask);
-  for (const label of GARMENT_EXTRA_LABELS) {
+  for (const label of EXTRA_LABELS[target]) {
     const mask = byLabel.get(label);
     if (!mask) continue;
     for (let i = 0; i < combined.length; i++) {
       if (mask[i] > OPAQUE_THRESHOLD) combined[i] = 255;
     }
   }
+  fillEnclosedHoles(combined, w, h);
 
   const soft = boxBlurChannel(combined, w, h, options.maskBlurPx);
   const alpha = new Uint8ClampedArray(w * h);

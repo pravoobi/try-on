@@ -17,7 +17,14 @@ import {
   suggestAnchors,
   suggestPantsAnchors,
 } from '@practics/tryon-core';
-import type { GarmentAnchors, HemLength, PipelineResult, Point, SkirtAnchors } from '@practics/tryon-core';
+import type {
+  GarmentAnchors,
+  GarmentTarget,
+  HemLength,
+  PipelineResult,
+  Point,
+  SkirtAnchors,
+} from '@practics/tryon-core';
 
 interface Draft {
   image: ImageBitmap;
@@ -26,6 +33,18 @@ interface Draft {
   alphaData: Uint8ClampedArray;
   width: number;
   height: number;
+  /**
+   * The original file, kept so a category change that crosses the
+   * upper/lower boundary can re-run EXTRACTION (not just anchor
+   * suggestion): an on-model photo contains both a top and a bottom, and
+   * which one the parser keeps depends on the target we pass it.
+   */
+  file: File;
+}
+
+/** Which half of a worn outfit a category's photo depicts (see tryon-core GarmentTarget). */
+function targetFor(category: UploadCategory): GarmentTarget {
+  return category === 'pants' ? 'lower' : 'upper';
 }
 
 type UploadStep =
@@ -222,9 +241,9 @@ export function GarmentUpload({ onGarmentAdded, previewImage, previewResult }: P
   const spec = editorSpec(category, isPants ? 'sleeveless' : sleeves);
   const lengthOptions = isPants ? HEM_LENGTHS.filter((l) => l !== 'hip') : HEM_LENGTHS;
 
-  const processPhoto = async (file: File): Promise<Draft | null> => {
+  const processPhoto = async (file: File, target: GarmentTarget): Promise<Draft | null> => {
     const raw = await createImageBitmap(file);
-    const matted = await matting.removeBackground(raw); // transfers `raw`
+    const matted = await matting.removeBackground(raw, target); // transfers `raw`
     const cropped = await cropToAlphaBBox(matted);
     matted.close();
     if (!cropped) {
@@ -237,6 +256,7 @@ export function GarmentUpload({ onGarmentAdded, previewImage, previewResult }: P
       alphaData: cropped.alphaData,
       width: cropped.width,
       height: cropped.height,
+      file,
     };
   };
 
@@ -244,15 +264,16 @@ export function GarmentUpload({ onGarmentAdded, previewImage, previewResult }: P
     setError(null);
     setStep({ kind: 'front-processing', note: 'removing background…' });
     try {
-      const front = await processPhoto(file);
+      const front = await processPhoto(file, targetFor(category));
       if (!front) {
         setStep({ kind: 'front-select' });
         return;
       }
-      const suggested = suggestMeta(front.image.width, front.image.height);
-      setCategory(suggested.category);
-      setLength(suggested.length);
-      front.anchors = suggestFor(front, suggested.category, sleeves);
+      // Category was chosen before upload (it decides which half of a worn
+      // outfit to extract), so only refine the LENGTH from the silhouette —
+      // and only for top-like garments, since pants set their own default.
+      if (category !== 'pants') setLength(suggestMeta(front.image.width, front.image.height).length);
+      front.anchors = suggestFor(front, category, sleeves);
       setStep({ kind: 'front-edit', front });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -264,7 +285,7 @@ export function GarmentUpload({ onGarmentAdded, previewImage, previewResult }: P
     setError(null);
     setStep({ kind: 'back-processing', front, note: 'removing background…' });
     try {
-      const back = await processPhoto(file);
+      const back = await processPhoto(file, targetFor(category));
       if (!back) {
         setStep({ kind: 'back-select', front });
         return;
@@ -277,10 +298,42 @@ export function GarmentUpload({ onGarmentAdded, previewImage, previewResult }: P
     }
   };
 
-  /** Applies a category change to the open draft(s): new suggestion + shape rules. */
+  /**
+   * Applies a category change to the open draft(s). Crossing the
+   * upper/lower boundary (e.g. dress → pants) re-runs EXTRACTION from the
+   * retained original file, because the parser keeps a different garment
+   * class for each target — a photo extracted as a top holds no trouser
+   * pixels to re-anchor. Staying within a family only re-suggests anchors.
+   */
   const changeCategory = (next: UploadCategory) => {
+    const prevTarget = targetFor(category);
     setCategory(next);
     setLength(CATEGORY_DEFAULT_LENGTH[next]);
+
+    if (targetFor(next) !== prevTarget) {
+      setStep((prev) => {
+        if (prev.kind !== 'front-edit') return prev;
+        void (async () => {
+          setError(null);
+          setStep({ kind: 'front-processing', note: 're-extracting for the new category…' });
+          try {
+            const front = await processPhoto(prev.front.file, targetFor(next));
+            if (!front) {
+              setStep({ kind: 'front-select' });
+              return;
+            }
+            front.anchors = suggestFor(front, next, sleeves);
+            setStep({ kind: 'front-edit', front });
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+            setStep({ kind: 'front-select' });
+          }
+        })();
+        return prev;
+      });
+      return;
+    }
+
     setStep((prev) => {
       if (prev.kind === 'front-edit') {
         return { ...prev, front: { ...prev.front, anchors: suggestFor(prev.front, next, sleeves) } };
@@ -397,9 +450,23 @@ export function GarmentUpload({ onGarmentAdded, previewImage, previewResult }: P
 
       {step.kind === 'front-select' && (
         <>
+          {/* Category is chosen BEFORE the file, not auto-detected after: a
+              worn photo contains both a top and a bottom, and which one gets
+              extracted depends on this. Guessing from the silhouette would
+              pull the model's shirt out of a trousers photo half the time. */}
+          <label>
+            what are you uploading?{' '}
+            <select value={category} onChange={(e) => changeCategory(e.target.value as UploadCategory)}>
+              {UPLOAD_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="hint">
             front photo — flat-lay, on a hanger, or worn by someone (the person is removed
-            automatically, keeping just the garment). Tops, dresses, kurtis, and pants all work.
+            automatically, keeping just the {category === 'pants' ? 'trousers' : 'garment'}).
           </p>
           <label>
             <input

@@ -4,7 +4,7 @@
  * into a consuming app's main bundle. Only matting.worker.ts imports the
  * library itself.
  */
-import type { GarmentExtractOptions } from './garmentExtract.js';
+import type { GarmentExtractOptions, GarmentTarget } from './garmentExtract.js';
 
 export type MattingAccelerator = 'webgpu' | 'wasm';
 
@@ -29,6 +29,12 @@ export interface MattingProcessRequest {
    * strip the very person the mask is for.
    */
   mode?: 'garment' | 'person';
+  /**
+   * Which half of a worn outfit to extract (see garmentExtract.ts
+   * GarmentTarget) — 'lower' for pants/shorts, else 'upper'. Ignored in
+   * 'person' mode. Defaults to 'upper'.
+   */
+  target?: GarmentTarget;
 }
 
 export type MattingWorkerRequest = MattingInitRequest | MattingProcessRequest;

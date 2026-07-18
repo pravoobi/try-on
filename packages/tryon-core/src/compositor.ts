@@ -32,6 +32,7 @@ import {
   type BodyAnchors,
   type DepthMapSource,
   type GarmentAnchors,
+  type HemFlare,
   type HemLength,
   type Keypoint,
   type Point,
@@ -92,6 +93,12 @@ export interface OutfitTopPiece {
    * Omitted/'sleeveless' leaves sleeves in the product photo's pose.
    */
   sleeves?: SleeveLength;
+  /**
+   * Hem flare (see types.ts HemFlare) — 'skirt' for a single-image
+   * lehenga-choli or any ghagra-style garment whose own hem is far wider
+   * than its waist. Defaults to 'dress'.
+   */
+  hemFlare?: HemFlare;
   /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
   normal?: (CanvasImageSource & { width: number; height: number }) | null;
 }
@@ -157,7 +164,7 @@ export function renderOutfitTryOn(ctx: Canvas2DContext, input: OutfitTryOnInput)
   // either present piece can't anchor, neither can — one status covers all.
   let topBody: BodyAnchors | null = null;
   if (top) {
-    const raw = computeBodyAnchors(keypoints, top.hemLength, config, top.sleeves);
+    const raw = computeBodyAnchors(keypoints, top.hemLength, config, top.sleeves, top.hemFlare);
     if (!raw) return 'pose-not-anchorable';
     topBody = foreshortenAnchors(raw, foreshorten);
   }

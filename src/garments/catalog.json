@@ -156,220 +156,567 @@
     }
   },
   {
-    "id": "tshirt-offwhite-01",
-    "category": "tshirt",
-    "image": "/garments/tshirt-offwhite-01.png",
+    "id": "pants-black-formal",
+    "category": "pants",
+    "image": "/garments/pants-black-formal.png",
     "anchors": {
-      "shoulderL": [
-        128,
-        84
-      ],
-      "shoulderR": [
-        512,
-        84
-      ],
       "waistL": [
-        152,
-        404
+        34,
+        339
       ],
       "waistR": [
-        488,
-        404
+        476,
+        339
       ],
       "hemL": [
-        158,
-        600
+        39.2,
+        1246
       ],
       "hemR": [
-        482,
-        600
-      ],
-      "cuffL": [
-        127,
-        277
-      ],
-      "cuffR": [
-        513,
-        277
+        465.2,
+        1246
       ]
     },
     "meta": {
-      "sleeves": "half",
-      "length": "hip"
+      "sleeves": "sleeveless",
+      "length": "ankle"
     }
   },
   {
-    "id": "tshirt-navy-01",
-    "category": "tshirt",
-    "image": "/garments/tshirt-navy-01.png",
+    "id": "pants-black-pleated-wide",
+    "category": "pants",
+    "image": "/garments/pants-black-pleated-wide.png",
     "anchors": {
-      "shoulderL": [
-        128,
-        84
-      ],
-      "shoulderR": [
-        512,
-        84
-      ],
       "waistL": [
-        152,
-        404
+        102,
+        362
       ],
       "waistR": [
-        488,
-        404
+        578,
+        362
       ],
       "hemL": [
-        158,
-        600
+        92.9,
+        1301
       ],
       "hemR": [
-        482,
-        600
-      ],
-      "cuffL": [
-        127,
-        277
-      ],
-      "cuffR": [
-        513,
-        277
+        659.2,
+        1301
       ]
     },
     "meta": {
-      "sleeves": "half",
-      "length": "hip"
+      "sleeves": "sleeveless",
+      "length": "ankle"
     }
   },
   {
-    "id": "shirt-oxford-blue-01",
+    "id": "pants-brown-regular",
+    "category": "pants",
+    "image": "/garments/pants-brown-regular.png",
+    "anchors": {
+      "waistL": [
+        19,
+        201
+      ],
+      "waistR": [
+        424,
+        201
+      ],
+      "hemL": [
+        226.3,
+        1209
+      ],
+      "hemR": [
+        456.7,
+        1209
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "pants-navy-straight",
+    "category": "pants",
+    "image": "/garments/pants-navy-straight.png",
+    "anchors": {
+      "waistL": [
+        25,
+        313
+      ],
+      "waistR": [
+        451,
+        313
+      ],
+      "hemL": [
+        182.3,
+        1267
+      ],
+      "hemR": [
+        606.5,
+        1267
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "pants-blue-regular",
+    "category": "pants",
+    "image": "/garments/pants-blue-regular.png",
+    "anchors": {
+      "waistL": [
+        156,
+        137
+      ],
+      "waistR": [
+        458,
+        137
+      ],
+      "hemL": [
+        52.4,
+        893
+      ],
+      "hemR": [
+        429.9,
+        893
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "pants-cream-straight",
+    "category": "pants",
+    "image": "/garments/pants-cream-straight.png",
+    "anchors": {
+      "waistL": [
+        19,
+        238
+      ],
+      "waistR": [
+        448,
+        238
+      ],
+      "hemL": [
+        256,
+        1307
+      ],
+      "hemR": [
+        480.6,
+        1307
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "pants-olive-01",
+    "category": "pants",
+    "image": "/garments/pants-olive-01.png",
+    "anchors": {
+      "waistL": [
+        32,
+        150
+      ],
+      "waistR": [
+        384,
+        150
+      ],
+      "hemL": [
+        45.2,
+        956
+      ],
+      "hemR": [
+        482.1,
+        956
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "pants-red-01",
+    "category": "pants",
+    "image": "/garments/pants-red-01.png",
+    "anchors": {
+      "waistL": [
+        34,
+        286
+      ],
+      "waistR": [
+        535,
+        286
+      ],
+      "hemL": [
+        254.2,
+        1038
+      ],
+      "hemR": [
+        583.8,
+        1038
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "shorts-relaxed-denim",
+    "category": "pants",
+    "image": "/garments/shorts-relaxed-denim.png",
+    "anchors": {
+      "waistL": [
+        92,
+        99
+      ],
+      "waistR": [
+        332,
+        99
+      ],
+      "hemL": [
+        190.3,
+        353
+      ],
+      "hemR": [
+        361.6,
+        353
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "knee"
+    }
+  },
+  {
+    "id": "shorts-relaxed-fit-denim",
+    "category": "pants",
+    "image": "/garments/shorts-relaxed-fit-denim.png",
+    "anchors": {
+      "waistL": [
+        75,
+        121
+      ],
+      "waistR": [
+        391,
+        121
+      ],
+      "hemL": [
+        59.1,
+        483
+      ],
+      "hemR": [
+        358.1,
+        483
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "knee"
+    }
+  },
+  {
+    "id": "shorts-green-skinny",
+    "category": "pants",
+    "image": "/garments/shorts-green-skinny.png",
+    "anchors": {
+      "waistL": [
+        33,
+        160
+      ],
+      "waistR": [
+        436,
+        160
+      ],
+      "hemL": [
+        52.7,
+        601
+      ],
+      "hemR": [
+        295.8,
+        601
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "knee"
+    }
+  },
+  {
+    "id": "shirt-pink-formal",
     "category": "shirt",
-    "image": "/garments/shirt-oxford-blue-01.png",
+    "image": "/garments/shirt-pink-formal.png",
     "anchors": {
       "shoulderL": [
-        128,
-        84
+        135,
+        241
       ],
       "shoulderR": [
-        512,
-        84
+        969,
+        241
       ],
       "waistL": [
-        153,
-        435
+        245,
+        815
       ],
       "waistR": [
-        487,
-        435
+        794,
+        815
       ],
       "hemL": [
-        158,
-        650
+        314.5,
+        866
       ],
       "hemR": [
-        482,
-        650
+        731,
+        866
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "hip"
+    },
+    "back": {
+      "image": "/garments/shirt-pink-formal-back.png",
+      "anchors": {
+        "shoulderL": [
+          86,
+          287
+        ],
+        "shoulderR": [
+          766,
+          287
+        ],
+        "waistL": [
+          163,
+          972
+        ],
+        "waistR": [
+          672,
+          972
+        ],
+        "hemL": [
+          224,
+          1033
+        ],
+        "hemR": [
+          615,
+          1033
+        ]
+      }
+    }
+  },
+  {
+    "id": "shirt-white-01",
+    "category": "shirt",
+    "image": "/garments/shirt-white-01.png",
+    "anchors": {
+      "shoulderL": [
+        38,
+        138
       ],
-      "elbowL": [
-        104,
-        429
+      "shoulderR": [
+        392,
+        138
       ],
-      "elbowR": [
-        536,
-        429
+      "waistL": [
+        26,
+        458
       ],
-      "cuffL": [
-        98,
-        620
+      "waistR": [
+        304,
+        458
       ],
-      "cuffR": [
-        542,
-        620
+      "hemL": [
+        31.3,
+        494
+      ],
+      "hemR": [
+        263.4,
+        494
       ]
     },
     "meta": {
       "sleeves": "full",
       "length": "hip"
+    },
+    "back": {
+      "image": "/garments/shirt-white-01-back.png",
+      "anchors": {
+        "shoulderL": [
+          60,
+          253
+        ],
+        "shoulderR": [
+          644,
+          253
+        ],
+        "waistL": [
+          69.2,
+          616
+        ],
+        "waistR": [
+          615.6,
+          616
+        ],
+        "hemL": [
+          76.8,
+          913
+        ],
+        "hemR": [
+          592.4,
+          913
+        ]
+      }
     }
   },
   {
-    "id": "jeans-blue-01",
-    "category": "pants",
-    "image": "/garments/jeans-blue-01.png",
+    "id": "tshirt-green-printed",
+    "category": "tshirt",
+    "image": "/garments/tshirt-green-printed.png",
     "anchors": {
+      "shoulderL": [
+        70,
+        260
+      ],
+      "shoulderR": [
+        783,
+        260
+      ],
       "waistL": [
-        152,
-        64
+        225,
+        516
       ],
       "waistR": [
-        448,
-        64
+        630,
+        516
       ],
       "hemL": [
-        148,
-        958
+        105.7,
+        933
       ],
       "hemR": [
-        452,
-        958
+        562.8,
+        933
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "hip"
+    }
+  },
+  {
+    "id": "kurti-floral-printed-02",
+    "category": "kurti",
+    "image": "/garments/kurti-floral-printed-02.png",
+    "anchors": {
+      "shoulderL": [
+        137,
+        99
+      ],
+      "shoulderR": [
+        481,
+        99
+      ],
+      "waistL": [
+        144.7,
+        439
+      ],
+      "waistR": [
+        489.2,
+        439
+      ],
+      "hemL": [
+        151,
+        718
+      ],
+      "hemR": [
+        495.9,
+        718
       ]
     },
     "meta": {
       "sleeves": "sleeveless",
-      "length": "ankle"
+      "length": "knee"
     }
   },
   {
-    "id": "chinos-khaki-01",
-    "category": "pants",
-    "image": "/garments/chinos-khaki-01.png",
+    "id": "kurti-floral-printed-01",
+    "category": "kurti",
+    "image": "/garments/kurti-floral-printed-01.png",
     "anchors": {
+      "shoulderL": [
+        162,
+        268
+      ],
+      "shoulderR": [
+        555,
+        268
+      ],
       "waistL": [
-        152,
-        64
+        159,
+        423
       ],
       "waistR": [
-        448,
-        64
+        503,
+        423
       ],
       "hemL": [
-        148,
-        958
+        191.4,
+        1064
       ],
       "hemR": [
-        452,
-        958
+        562.6,
+        1064
       ]
     },
     "meta": {
       "sleeves": "sleeveless",
-      "length": "ankle"
+      "length": "knee"
     }
   },
   {
-    "id": "shorts-gray-01",
-    "category": "pants",
-    "image": "/garments/shorts-gray-01.png",
+    "id": "kurti-motifs-printed",
+    "category": "kurti",
+    "image": "/garments/kurti-motifs-printed.png",
     "anchors": {
+      "shoulderL": [
+        102,
+        200
+      ],
+      "shoulderR": [
+        517,
+        200
+      ],
       "waistL": [
-        152,
-        64
+        143,
+        368
       ],
       "waistR": [
-        448,
-        64
+        472,
+        368
       ],
       "hemL": [
-        148,
-        501
+        62.6,
+        1063
       ],
       "hemR": [
-        452,
-        501
+        530.2,
+        1063
       ]
     },
     "meta": {
-      "sleeves": "sleeveless",
+      "sleeves": "half",
       "length": "knee"
     }
   }

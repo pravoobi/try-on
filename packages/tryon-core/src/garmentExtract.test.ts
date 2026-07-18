@@ -43,8 +43,80 @@ describe('extractGarmentAlpha', () => {
     // Face rows removed, garment rows kept, pants/legs removed.
     expect(result.alpha[2 * W]).toBe(0); // face
     expect(result.alpha[5 * W]).toBe(255); // upper-clothes
-    expect(result.alpha[12 * W]).toBe(0); // pants (not an upload category)
+    expect(result.alpha[12 * W]).toBe(0); // pants (the default target is 'upper')
     expect(result.alpha[15 * W]).toBe(0); // leg
+  });
+
+  it("target 'lower' keeps the trousers and drops the top the model is also wearing", () => {
+    // The whole point of the target: an on-model trousers photo contains a
+    // shirt too, and picking the largest garment class would extract the
+    // wrong half about as often as not.
+    const foreground = rowBand(0, 17);
+    const result = extractGarmentAlpha(foreground, wornPhotoSegments(), W, H, {
+      ...OPTIONS,
+      target: 'lower',
+    });
+    expect(result.kind).toBe('garment');
+    if (result.kind !== 'garment') return;
+    expect(result.alpha[5 * W]).toBe(0); // upper-clothes dropped
+    expect(result.alpha[12 * W]).toBe(255); // pants kept
+    expect(result.alpha[2 * W]).toBe(0); // face still removed
+    expect(result.alpha[15 * W]).toBe(0); // legs still removed
+  });
+
+  it('fills a hole punched through the garment by an occluder (hair over a shoulder)', () => {
+    // Garment rows 4-11, with a 'Hair' blob sitting fully inside them — the
+    // fabric continues behind the hair, so the cutout must not be holed.
+    const hair = new Uint8ClampedArray(W * H);
+    for (let y = 6; y < 9; y++) {
+      for (let x = 8; x < 12; x++) hair[y * W + x] = 255;
+    }
+    const upper = rowBand(4, 12);
+    for (let y = 6; y < 9; y++) {
+      for (let x = 8; x < 12; x++) upper[y * W + x] = 0; // parser assigned these to Hair
+    }
+    const segments: LabelMask[] = [
+      { label: 'Face', maskData: rowBand(0, 4) },
+      { label: 'Hair', maskData: hair },
+      { label: 'Upper-clothes', maskData: upper },
+      { label: 'Left-leg', maskData: rowBand(12, 17) },
+    ];
+    const result = extractGarmentAlpha(rowBand(0, 17), segments, W, H, OPTIONS);
+    expect(result.kind).toBe('garment');
+    if (result.kind !== 'garment') return;
+    expect(result.alpha[7 * W + 10]).toBe(255); // hole filled
+    expect(result.alpha[2 * W]).toBe(0); // face still removed — fill is interior-only
+    expect(result.alpha[14 * W]).toBe(0); // leg still removed
+  });
+
+  it('leaves a gap that opens to the image border alone (the space between trouser legs)', () => {
+    // Two legs with a gap between them running to the bottom edge: that gap
+    // reaches the border, so it is NOT enclosed and must stay transparent.
+    const pants = new Uint8ClampedArray(W * H);
+    for (let y = 4; y < H; y++) {
+      for (let x = 2; x < 9; x++) pants[y * W + x] = 255;
+      for (let x = 11; x < 18; x++) pants[y * W + x] = 255;
+    }
+    const segments: LabelMask[] = [
+      { label: 'Face', maskData: rowBand(0, 4) },
+      { label: 'Pants', maskData: pants },
+    ];
+    const result = extractGarmentAlpha(rowBand(0, H), segments, W, H, { ...OPTIONS, target: 'lower' });
+    expect(result.kind).toBe('garment');
+    if (result.kind !== 'garment') return;
+    expect(result.alpha[10 * W + 5]).toBe(255); // left leg
+    expect(result.alpha[10 * W + 14]).toBe(255); // right leg
+    expect(result.alpha[10 * W + 10]).toBe(0); // gap between them survives
+  });
+
+  it("target 'lower' reports no-garment-found on a photo with no lower garment", () => {
+    const segments: LabelMask[] = [
+      { label: 'Face', maskData: rowBand(0, 4) },
+      { label: 'Dress', maskData: rowBand(4, 15) },
+      { label: 'Left-leg', maskData: rowBand(15, 17) },
+    ];
+    const result = extractGarmentAlpha(rowBand(0, 17), segments, W, H, { ...OPTIONS, target: 'lower' });
+    expect(result.kind).toBe('no-garment-found');
   });
 
   it('never exceeds the matting alpha (soft edges preserved)', () => {

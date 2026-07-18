@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { assetUrl } from '../assetUrl';
-import type { Garment } from '../garments/schema';
+import { isTwoPieceLehenga, type Garment } from '../garments/schema';
 import { USER_GARMENT_ID_PREFIX } from '../garments/userGarmentStore';
 
 interface Props {
@@ -68,7 +68,7 @@ export function GarmentPicker({ garments, selectedIds, onSelect, onDelete }: Pro
             onClick={() => onSelect(g)}
             title={`${g.id} (${g.category}, ${g.meta.sleeves}, ${g.meta.length}-length)`}
           >
-            <img src={assetUrl(g.category === 'lehenga-choli' ? g.choli.image : g.image)} alt={g.id} />
+            <img src={assetUrl(isTwoPieceLehenga(g) ? g.choli.image : g.image)} alt={g.id} />
           </button>
           {onDelete && g.id.startsWith(USER_GARMENT_ID_PREFIX) && <DeleteBadge id={g.id} onDelete={onDelete} />}
         </div>

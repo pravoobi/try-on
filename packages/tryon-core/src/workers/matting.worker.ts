@@ -16,7 +16,12 @@
  */
 import { env, pipeline, RawImage } from '@huggingface/transformers';
 import { DEFAULT_GARMENT_EXTRACT_CONFIG } from '../config.js';
-import { extractGarmentAlpha, type GarmentExtractOptions, type LabelMask } from '../garmentExtract.js';
+import {
+  extractGarmentAlpha,
+  type GarmentExtractOptions,
+  type GarmentTarget,
+  type LabelMask,
+} from '../garmentExtract.js';
 import type { MattingAccelerator, MattingWorkerRequest, MattingWorkerResponse } from '../mattingTypes.js';
 
 // A one-time model download only stays one-time if the browser cache
@@ -55,7 +60,7 @@ self.onmessage = (e: MessageEvent<MattingWorkerRequest>) => {
     if (msg.garmentExtractConfig) garmentExtractConfig = msg.garmentExtractConfig;
     queue = queue.then(() => init(msg.device));
   } else if (msg.type === 'process') {
-    queue = queue.then(() => process(msg.bitmap, msg.seq, msg.mode ?? 'garment'));
+    queue = queue.then(() => process(msg.bitmap, msg.seq, msg.mode ?? 'garment', msg.target ?? 'upper'));
   }
 };
 
@@ -85,7 +90,12 @@ async function init(device: MattingAccelerator): Promise<void> {
   }
 }
 
-async function process(bitmap: ImageBitmap, seq: number, mode: 'garment' | 'person'): Promise<void> {
+async function process(
+  bitmap: ImageBitmap,
+  seq: number,
+  mode: 'garment' | 'person',
+  target: GarmentTarget,
+): Promise<void> {
   try {
     if (!matter || !parser) throw new Error('matting models not initialized');
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
@@ -122,7 +132,10 @@ async function process(bitmap: ImageBitmap, seq: number, mode: 'garment' | 'pers
       .filter((s) => s.label !== null && s.mask.width === w && s.mask.height === h)
       .map((s) => ({ label: s.label as string, maskData: new Uint8ClampedArray(s.mask.data) }));
 
-    const extraction = extractGarmentAlpha(foregroundAlpha, labelMasks, w, h, garmentExtractConfig);
+    const extraction = extractGarmentAlpha(foregroundAlpha, labelMasks, w, h, {
+      ...garmentExtractConfig,
+      target,
+    });
     if (extraction.kind === 'garment') {
       for (let i = 0; i < w * h; i++) {
         rgba[i * 4 + 3] = extraction.alpha[i];

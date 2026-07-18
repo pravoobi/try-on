@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createMattingWorker } from '@practics/tryon-core/workers';
-import type { MattingWorkerRequest, MattingWorkerResponse } from '@practics/tryon-core';
+import type { GarmentTarget, MattingWorkerRequest, MattingWorkerResponse } from '@practics/tryon-core';
 import { config } from '../config';
 
 export type MattingStatus = 'off' | 'downloading' | 'ready' | 'error';
@@ -20,8 +20,13 @@ export interface UseMatting {
   /** Model-download progress in [0,1], or null before download starts / once ready. */
   progress: number | null;
   error: string | null;
-  /** Runs background removal on a bitmap. The bitmap is transferred (consumed). Rejects if not ready. */
-  removeBackground: (bitmap: ImageBitmap) => Promise<ImageBitmap>;
+  /**
+   * Runs background removal + worn-garment extraction on a bitmap. `target`
+   * says which half of a worn outfit to keep ('lower' for pants/shorts) —
+   * an on-model photo contains both halves, so guessing gets it wrong about
+   * as often as not. The bitmap is transferred (consumed). Rejects if not ready.
+   */
+  removeBackground: (bitmap: ImageBitmap, target?: GarmentTarget) => Promise<ImageBitmap>;
   /**
    * Plain MODNet person matte (no garment extraction): the result's alpha
    * channel is a high-quality person mask, for refining the low-res
@@ -117,21 +122,27 @@ export function useMatting(): UseMatting {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 
-  const request = useCallback((bitmap: ImageBitmap, mode: 'garment' | 'person'): Promise<ImageBitmap> => {
-    const worker = workerRef.current;
-    if (!worker) {
-      bitmap.close();
-      return Promise.reject(new Error('matting not enabled'));
-    }
-    const seq = ++seqRef.current;
-    return new Promise<ImageBitmap>((resolve, reject) => {
-      pendingRef.current.set(seq, { resolve, reject });
-      const req: MattingWorkerRequest = { type: 'process', bitmap, seq, mode };
-      worker.postMessage(req, [bitmap]);
-    });
-  }, []);
+  const request = useCallback(
+    (bitmap: ImageBitmap, mode: 'garment' | 'person', target?: GarmentTarget): Promise<ImageBitmap> => {
+      const worker = workerRef.current;
+      if (!worker) {
+        bitmap.close();
+        return Promise.reject(new Error('matting not enabled'));
+      }
+      const seq = ++seqRef.current;
+      return new Promise<ImageBitmap>((resolve, reject) => {
+        pendingRef.current.set(seq, { resolve, reject });
+        const req: MattingWorkerRequest = { type: 'process', bitmap, seq, mode, target };
+        worker.postMessage(req, [bitmap]);
+      });
+    },
+    [],
+  );
 
-  const removeBackground = useCallback((bitmap: ImageBitmap) => request(bitmap, 'garment'), [request]);
+  const removeBackground = useCallback(
+    (bitmap: ImageBitmap, target?: GarmentTarget) => request(bitmap, 'garment', target),
+    [request],
+  );
   const mattePerson = useCallback((bitmap: ImageBitmap) => request(bitmap, 'person'), [request]);
 
   return { enabled, setEnabled, status, progress, error, removeBackground, mattePerson };

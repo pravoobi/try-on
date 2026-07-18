@@ -6,7 +6,14 @@ import { GarmentPicker } from './components/GarmentPicker';
 import { GarmentUpload } from './components/GarmentUpload';
 import { PerfStats } from './components/PerfStats';
 import { config } from './config';
-import type { Garment, LehengaCholiGarment, PantsGarment, SinglePieceGarment } from './garments/schema';
+import {
+  isTwoPieceLehenga,
+  type Garment,
+  type LehengaCholiGarment,
+  type PantsGarment,
+  type SingleImageLehengaGarment,
+  type SinglePieceGarment,
+} from './garments/schema';
 import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
 import { useGestureSwipe } from './hooks/useGestureSwipe';
@@ -66,7 +73,7 @@ type Mode = 'photo' | 'live';
  * Everything else top-like (tshirt/shirt/top/kurti/dress) coexists with
  * pants in the bottom slot — kurti-over-jeans being the classic combo.
  */
-type TopSlotGarment = SinglePieceGarment | LehengaCholiGarment;
+type TopSlotGarment = SinglePieceGarment | LehengaCholiGarment | SingleImageLehengaGarment;
 
 export default function App() {
   const [mode, setMode] = useState<Mode>('photo');
@@ -408,18 +415,22 @@ export default function App() {
     setGarmentError(null);
     void (async () => {
       try {
-        const next: LoadedGarmentImages =
-          selectedTop.category === 'lehenga-choli'
-            ? {
-                kind: 'lehenga-choli',
-                choliImage: await fetchBitmap(selectedTop.choli.image),
-                lehengaImage: await fetchBitmap(selectedTop.lehenga.image),
-              }
-            : {
-                kind: 'single',
-                image: await fetchBitmap(selectedTop.image),
-                backImage: selectedTop.back ? await fetchBitmap(selectedTop.back.image) : null,
-              };
+        // A single-image lehenga-choli loads like any other one-piece
+        // garment — only the two-piece shape needs the pair.
+        const next: LoadedGarmentImages = isTwoPieceLehenga(selectedTop)
+          ? {
+              kind: 'lehenga-choli',
+              choliImage: await fetchBitmap(selectedTop.choli.image),
+              lehengaImage: await fetchBitmap(selectedTop.lehenga.image),
+            }
+          : {
+              kind: 'single',
+              image: await fetchBitmap(selectedTop.image),
+              backImage:
+                selectedTop.category !== 'lehenga-choli' && selectedTop.back
+                  ? await fetchBitmap(selectedTop.back.image)
+                  : null,
+            };
         if (cancelled) {
           closeGarmentImages(next);
           return;
@@ -660,7 +671,7 @@ export default function App() {
         )
       : 1;
 
-    if (selectedTop?.category === 'lehenga-choli') {
+    if (selectedTop && isTwoPieceLehenga(selectedTop)) {
       // Transient mismatch guard: the slot changed shape and the async image
       // load hasn't landed yet — skip a render rather than pass mismatched
       // data (each piece below guards the same way).
@@ -686,12 +697,16 @@ export default function App() {
       // warping onto the body, since the shoulder that anchors the front's
       // left side anchors the back's right side once viewed from behind
       // (see anchorMapping.mirrorAnchorsLR).
-      const useBack = viewSelection.useBack && garmentImages.backImage && selectedTop.back;
+      const back = selectedTop.category === 'lehenga-choli' ? undefined : selectedTop.back;
+      const useBack = viewSelection.useBack && garmentImages.backImage && back;
       top = {
         image: useBack ? garmentImages.backImage! : garmentImages.image,
-        anchors: useBack ? mirrorAnchorsLR(selectedTop.back!.anchors) : selectedTop.anchors,
+        anchors: useBack ? mirrorAnchorsLR(back!.anchors) : selectedTop.anchors,
         hemLength: selectedTop.meta.length,
         sleeves: selectedTop.meta.sleeves,
+        // A one-image lehenga rides this single-piece path but must keep the
+        // skirt's dramatic flare (see tryon-core HemFlare).
+        hemFlare: selectedTop.category === 'lehenga-choli' ? 'skirt' : 'dress',
         normal: useBack
           ? (normals?.kind === 'single' ? normals.backNormal : null)
           : (normals?.kind === 'single' ? normals.normal : null),

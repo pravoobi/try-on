@@ -7,6 +7,7 @@ import {
   SKELETON_EDGES,
   type DepthMapSource,
   type GarmentAnchors,
+  type HemFlare,
   type HemLength,
   type KeypointName,
   type PartialTryOnConfig,
@@ -50,6 +51,8 @@ export type GarmentOverlay =
         hemLength: HemLength;
         /** Enables arm-following sleeves when `anchors` carries sleeve anchors (see tryon-core SLEEVE_ANCHOR_NAMES). */
         sleeves?: SleeveLength;
+        /** 'skirt' for a single-image lehenga-choli (see tryon-core HemFlare). */
+        hemFlare?: HemFlare;
         /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */
         normal?: OffscreenCanvas | null;
       } | null;
