@@ -11,6 +11,13 @@ priority of the embeddable widget below.
 
 1. ~~**Sleeve-aware warping**~~ — DONE 2026-07-18: optional elbow/cuff
    anchors + synthesized sleeve-cap pin (tryon-core `anchorCorrespondences`).
+   **Full-sleeve anchors are declined for a BENT arm** (`sleeve.minStraightness`,
+   cos of the elbow angle): a flat photo's straight sleeve can't fold around
+   a hand-on-hip elbow, and forcing the TPS to try bends the whole garment —
+   shipped briefly as the kurti's bust pinching inward with a sleeve tearing
+   off as a floating strip. Declining falls back to torso-only anchoring,
+   i.e. exactly the pre-feature rendering. Half sleeves are unaffected (they
+   end mid-upper-arm, so the forearm never enters into it).
    Residual to tune: a small shoulder gap can remain on the side whose arm
    hangs tightest against the body (largest rotation from the photo pose) —
    knobs are `SLEEVE_CAP_PIN_T` and per-garment elbow anchor placement.

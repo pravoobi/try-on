@@ -36,6 +36,16 @@ export interface AnchorConfig {
     halfCuffT: number;
     /** Full-sleeve cuff target, as a fraction of the way from the elbow to the wrist — slightly short of the wrist, where a real cuff sits. */
     fullCuffT: number;
+    /**
+     * Minimum cos of the elbow angle (1 = straight arm, 0 = right angle)
+     * for a FULL sleeve's anchors to be used at all. Below it the arm is
+     * folded — hand on hip, arms crossed — and a flat photo's straight
+     * sleeve can't be warped onto it without the TPS bending the whole
+     * neighbourhood, so the sleeve anchors are dropped entirely and the
+     * garment falls back to torso-only anchoring (see computeSleeveTargets).
+     * 0.5 ≈ tolerate up to a 60° bend.
+     */
+    minStraightness: number;
   };
 }
 
@@ -115,7 +125,7 @@ export const DEFAULT_CONFIG: TryOnConfig = {
     dressFlare: { hip: 1, knee: 1.2, ankle: 1.35 },
     stanceCoverMargin: 0.25,
     stanceScoreSoftBand: 0.15,
-    sleeve: { halfCuffT: 0.6, fullCuffT: 0.85 },
+    sleeve: { halfCuffT: 0.6, fullCuffT: 0.85, minStraightness: 0.5 },
   },
   relighting: {
     bboxMarginFrac: 0.15,

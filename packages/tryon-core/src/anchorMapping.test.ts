@@ -156,6 +156,39 @@ describe('computeBodyAnchors sleeve targets', () => {
     expect(out.cuffR).toBeDefined();
   });
 
+  it('regression: a bent arm (hand on hip) emits NO full-sleeve targets', () => {
+    // A flat photo's straight sleeve cannot fold around a bent elbow, and
+    // forcing the TPS to try drags the whole garment — observed as the
+    // kurti's bust pinching inward and a sleeve tearing off as a floating
+    // strip. Declining is the correct answer: fall back to torso-only.
+    const handOnHip: Keypoint[] = [
+      kp('left_shoulder', 85, 100),
+      kp('right_shoulder', 115, 100),
+      kp('left_hip', 90, 200),
+      kp('right_hip', 110, 200),
+      // Upper arm goes down-and-out, forearm comes back in to the hip:
+      // roughly a right angle at the elbow.
+      kp('left_elbow', 60, 160),
+      kp('left_wrist', 92, 195),
+      // Other arm hangs straight for contrast.
+      kp('right_elbow', 122, 160),
+      kp('right_wrist', 126, 215),
+    ];
+    const out = computeBodyAnchors(handOnHip, 'knee', config, 'full')!;
+    expect(out.elbowL).toBeUndefined();
+    expect(out.cuffL).toBeUndefined();
+    // The straight arm is unaffected.
+    expect(out.elbowR).toEqual([122, 160]);
+    expect(out.cuffR).toBeDefined();
+  });
+
+  it('pins the elbow only when the wrist is untracked (no forearm to judge)', () => {
+    const noWrist = SKELETON.map((k) => (k.name === 'left_wrist' ? { ...k, score: 0.1 } : k));
+    const out = computeBodyAnchors(noWrist, 'hip', config, 'full')!;
+    expect(out.elbowL).toEqual([80, 160]);
+    expect(out.cuffL).toBeUndefined();
+  });
+
   it("emits no sleeve targets for 'sleeveless' or when the param is omitted", () => {
     expect(computeBodyAnchors(SKELETON, 'hip', config, 'sleeveless')!.cuffL).toBeUndefined();
     expect(computeBodyAnchors(SKELETON, 'hip', config)!.cuffL).toBeUndefined();

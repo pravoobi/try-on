@@ -220,6 +220,22 @@ function computeFlaredHem(
 }
 
 /**
+ * cos of the angle between the upper arm and the forearm, 1 = perfectly
+ * straight, 0 = a right angle, negative = folded back on itself. Returns
+ * null when either segment is degenerate.
+ */
+function armStraightness(shoulder: Keypoint, elbow: Keypoint, wrist: Keypoint): number | null {
+  const ux = elbow.x - shoulder.x;
+  const uy = elbow.y - shoulder.y;
+  const fx = wrist.x - elbow.x;
+  const fy = wrist.y - elbow.y;
+  const ul = Math.hypot(ux, uy);
+  const fl = Math.hypot(fx, fy);
+  if (ul < 1e-3 || fl < 1e-3) return null;
+  return (ux * fx + uy * fy) / (ul * fl);
+}
+
+/**
  * Sleeve anchor targets for one arm (see types.ts SLEEVE_ANCHOR_NAMES): the
  * sleeve's midline follows the arm's own joint centers — no outward
  * widening, unlike torso anchors, since a sleeve wraps the arm rather than
@@ -227,6 +243,18 @@ function computeFlaredHem(
  * needs are confidently tracked; a missing target simply omits that TPS
  * correspondence, so the sleeve degrades to today's photo-pose behavior
  * rather than snapping to a garbage keypoint.
+ *
+ * A BENT arm emits nothing at all (see config.anchors.sleeve.minStraightness).
+ * The garment photo shows a straight, hanging sleeve, and a thin-plate
+ * spline is a single globally-smooth surface: asking it to send that
+ * straight sleeve's far-edge cuff to a wrist that has folded back toward
+ * the body — a hand on a hip — is a large, sharply-varying displacement,
+ * and TPS pays for it by bending everything nearby. Observed on a
+ * hand-on-hip photo as the kurti's bust pinching inward and the sleeve
+ * tearing off as a floating strip. The fabric would have to fold at the
+ * elbow to do this honestly, which a 2D warp of a flat photo cannot
+ * represent, so the correct answer is to decline: fall back to the
+ * torso-only anchors, exactly as before sleeve support existed.
  */
 function computeSleeveTargets(
   keypoints: readonly Keypoint[],
@@ -242,6 +270,8 @@ function computeSleeveTargets(
 
   if (sleeves === 'half') {
     if (!shoulder || shoulder.score < minScore) return {};
+    // A half sleeve ends mid-upper-arm, so only the shoulder→elbow segment
+    // matters — a bent forearm doesn't affect it and isn't checked.
     const t = config.anchors.sleeve.halfCuffT;
     // Raw shoulder joint (not the widened/lifted torso anchor) — the sleeve
     // runs down the arm's own centerline.
@@ -249,12 +279,22 @@ function computeSleeveTargets(
   }
 
   const wrist = findKeypoint(keypoints, `${side}_wrist`);
-  const out: { elbow?: Point; cuff?: Point } = { elbow: [elbow.x, elbow.y] };
-  if (wrist && wrist.score >= minScore) {
-    const t = config.anchors.sleeve.fullCuffT;
-    out.cuff = [lerp(elbow.x, wrist.x, t), lerp(elbow.y, wrist.y, t)];
+  if (!wrist || wrist.score < minScore || !shoulder || shoulder.score < minScore) {
+    // No usable forearm to check for bend: pin the elbow only, which stays
+    // near where a hanging arm's elbow sits and so displaces little.
+    return { elbow: [elbow.x, elbow.y] };
   }
-  return out;
+
+  const straightness = armStraightness(shoulder, elbow, wrist);
+  if (straightness !== null && straightness < config.anchors.sleeve.minStraightness) {
+    return {};
+  }
+
+  const t = config.anchors.sleeve.fullCuffT;
+  return {
+    elbow: [elbow.x, elbow.y],
+    cuff: [lerp(elbow.x, wrist.x, t), lerp(elbow.y, wrist.y, t)],
+  };
 }
 
 /**
