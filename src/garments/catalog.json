@@ -145,20 +145,20 @@
     "image": "/garments/pants-black-formal.png",
     "anchors": {
       "waistL": [
-        34,
-        339
+        18,
+        288
       ],
       "waistR": [
-        476,
-        339
+        383,
+        288
       ],
       "hemL": [
-        39.2,
-        1246
+        26.7,
+        1122
       ],
       "hemR": [
-        465.2,
-        1246
+        374.5,
+        1122
       ]
     },
     "meta": {
@@ -172,20 +172,20 @@
     "image": "/garments/pants-black-pleated-wide.png",
     "anchors": {
       "waistL": [
-        102,
-        362
+        69,
+        317
       ],
       "waistR": [
-        578,
-        362
+        446,
+        317
       ],
       "hemL": [
-        92.9,
-        1301
+        35.3,
+        1147
       ],
       "hemR": [
-        659.2,
-        1301
+        480,
+        1147
       ]
     },
     "meta": {
@@ -199,20 +199,20 @@
     "image": "/garments/pants-brown-regular.png",
     "anchors": {
       "waistL": [
-        19,
-        201
+        42,
+        300
       ],
       "waistR": [
-        424,
-        201
+        407,
+        300
       ],
       "hemL": [
-        226.3,
-        1209
+        25.7,
+        1085
       ],
       "hemR": [
-        456.7,
-        1209
+        422.2,
+        1085
       ]
     },
     "meta": {
@@ -226,20 +226,20 @@
     "image": "/garments/pants-navy-straight.png",
     "anchors": {
       "waistL": [
-        25,
-        313
+        28,
+        258
       ],
       "waistR": [
-        451,
-        313
+        354,
+        258
       ],
       "hemL": [
-        182.3,
-        1267
+        23,
+        960
       ],
       "hemR": [
-        606.5,
-        1267
+        358.5,
+        960
       ]
     },
     "meta": {
@@ -253,20 +253,20 @@
     "image": "/garments/pants-blue-regular.png",
     "anchors": {
       "waistL": [
-        156,
-        137
+        37,
+        265
       ],
       "waistR": [
-        458,
-        137
+        377,
+        265
       ],
       "hemL": [
-        52.4,
-        893
+        30.2,
+        966
       ],
       "hemR": [
-        429.9,
-        893
+        383.3,
+        966
       ]
     },
     "meta": {
@@ -280,20 +280,20 @@
     "image": "/garments/pants-cream-straight.png",
     "anchors": {
       "waistL": [
-        19,
-        238
+        13,
+        215
       ],
       "waistR": [
-        448,
-        238
+        341,
+        215
       ],
       "hemL": [
-        256,
-        1307
+        60.3,
+        991
       ],
       "hemR": [
-        480.6,
-        1307
+        304.8,
+        991
       ]
     },
     "meta": {
@@ -307,20 +307,20 @@
     "image": "/garments/pants-olive-01.png",
     "anchors": {
       "waistL": [
-        32,
-        150
+        50,
+        259
       ],
       "waistR": [
-        384,
-        150
+        370,
+        259
       ],
       "hemL": [
-        45.2,
-        956
+        31.5,
+        963
       ],
       "hemR": [
-        482.1,
-        956
+        389.6,
+        963
       ]
     },
     "meta": {
@@ -334,20 +334,20 @@
     "image": "/garments/pants-red-01.png",
     "anchors": {
       "waistL": [
-        34,
-        286
+        15,
+        237
       ],
       "waistR": [
-        535,
-        286
+        366,
+        237
       ],
       "hemL": [
-        254.2,
-        1038
+        47.6,
+        897
       ],
       "hemR": [
-        583.8,
-        1038
+        338.9,
+        897
       ]
     },
     "meta": {
@@ -356,25 +356,79 @@
     }
   },
   {
+    "id": "shorts-corduroy",
+    "category": "pants",
+    "image": "/garments/shorts-corduroy.png",
+    "anchors": {
+      "waistL": [
+        130,
+        222
+      ],
+      "waistR": [
+        742,
+        222
+      ],
+      "hemL": [
+        143,
+        794
+      ],
+      "hemR": [
+        729.5,
+        794
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "knee"
+    }
+  },
+  {
+    "id": "shorts-black-high-rise",
+    "category": "pants",
+    "image": "/garments/shorts-black-high-rise.png",
+    "anchors": {
+      "waistL": [
+        113,
+        235
+      ],
+      "waistR": [
+        769,
+        235
+      ],
+      "hemL": [
+        357.2,
+        843
+      ],
+      "hemR": [
+        633.1,
+        843
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "knee"
+    }
+  },
+  {
     "id": "shorts-relaxed-denim",
     "category": "pants",
     "image": "/garments/shorts-relaxed-denim.png",
     "anchors": {
       "waistL": [
-        92,
-        99
+        73,
+        145
       ],
       "waistR": [
-        332,
-        99
+        496,
+        145
       ],
       "hemL": [
-        190.3,
-        353
+        83.9,
+        519
       ],
       "hemR": [
-        361.6,
-        353
+        484.5,
+        519
       ]
     },
     "meta": {
@@ -388,20 +442,20 @@
     "image": "/garments/shorts-relaxed-fit-denim.png",
     "anchors": {
       "waistL": [
-        75,
-        121
+        100,
+        189
       ],
       "waistR": [
-        391,
-        121
+        597,
+        189
       ],
       "hemL": [
-        59.1,
-        483
+        121.7,
+        680
       ],
       "hemR": [
-        358.1,
-        483
+        554,
+        680
       ]
     },
     "meta": {
@@ -415,20 +469,20 @@
     "image": "/garments/shorts-green-skinny.png",
     "anchors": {
       "waistL": [
-        33,
-        160
+        43,
+        237
       ],
       "waistR": [
-        436,
-        160
+        599,
+        237
       ],
       "hemL": [
-        52.7,
-        601
+        74,
+        858
       ],
       "hemR": [
-        295.8,
-        601
+        567.9,
+        858
       ]
     },
     "meta": {
@@ -437,33 +491,95 @@
     }
   },
   {
+    "id": "shorts-white-denim",
+    "category": "pants",
+    "image": "/garments/shorts-white-denim.png",
+    "anchors": {
+      "waistL": [
+        89,
+        197
+      ],
+      "waistR": [
+        680,
+        197
+      ],
+      "hemL": [
+        164.1,
+        711
+      ],
+      "hemR": [
+        662.7,
+        711
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "knee"
+    }
+  },
+  {
+    "id": "shirt-denim-casual",
+    "category": "shirt",
+    "image": "/garments/shirt-denim-casual.png",
+    "anchors": {
+      "shoulderL": [
+        165,
+        197
+      ],
+      "shoulderR": [
+        635,
+        197
+      ],
+      "waistL": [
+        113.1,
+        476
+      ],
+      "waistR": [
+        687.2,
+        476
+      ],
+      "hemL": [
+        70.6,
+        705
+      ],
+      "hemR": [
+        730.1,
+        705
+      ]
+    },
+    "meta": {
+      "sleeves": "full",
+      "length": "hip"
+    }
+  },
+  {
     "id": "shirt-pink-formal",
     "category": "shirt",
     "image": "/garments/shirt-pink-formal.png",
     "anchors": {
       "shoulderL": [
-        135,
-        241
+        76,
+        201
       ],
       "shoulderR": [
-        969,
-        241
+        559,
+        201
       ],
       "waistL": [
-        245,
-        815
+        151,
+        683
       ],
       "waistR": [
-        794,
-        815
+        484,
+        683
       ],
       "hemL": [
-        314.5,
-        866
+        193.9,
+        726
       ],
       "hemR": [
-        731,
-        866
+        438.7,
+        726
       ]
     },
     "meta": {
@@ -474,28 +590,28 @@
       "image": "/garments/shirt-pink-formal-back.png",
       "anchors": {
         "shoulderL": [
-          86,
-          287
+          99,
+          291
         ],
         "shoulderR": [
-          766,
-          287
+          759,
+          291
         ],
         "waistL": [
-          163,
-          972
+          200,
+          981
         ],
         "waistR": [
-          672,
-          972
+          659,
+          981
         ],
         "hemL": [
-          224,
-          1033
+          252.8,
+          1042
         ],
         "hemR": [
-          615,
-          1033
+          605.9,
+          1042
         ]
       }
     }
@@ -506,28 +622,28 @@
     "image": "/garments/shirt-white-01.png",
     "anchors": {
       "shoulderL": [
-        38,
-        138
+        80,
+        223
       ],
       "shoulderR": [
-        392,
-        138
+        588,
+        223
       ],
       "waistL": [
-        26,
-        458
+        62.7,
+        543
       ],
       "waistR": [
-        304,
-        458
+        604.8,
+        543
       ],
       "hemL": [
-        31.3,
-        494
+        48.6,
+        804
       ],
       "hemR": [
-        263.4,
-        494
+        618.6,
+        804
       ],
       "elbowL": [
         58,
@@ -554,28 +670,28 @@
       "image": "/garments/shirt-white-01-back.png",
       "anchors": {
         "shoulderL": [
-          60,
-          253
+          69,
+          264
         ],
         "shoulderR": [
-          644,
-          253
+          667,
+          264
         ],
         "waistL": [
-          69.2,
-          616
+          121.1,
+          649
         ],
         "waistR": [
-          615.6,
-          616
+          614.8,
+          649
         ],
         "hemL": [
-          76.8,
-          913
+          163.8,
+          964
         ],
         "hemR": [
-          592.4,
-          913
+          572.1,
+          964
         ]
       }
     }
@@ -586,32 +702,195 @@
     "image": "/garments/tshirt-green-printed.png",
     "anchors": {
       "shoulderL": [
-        70,
-        260
+        75,
+        277
       ],
       "shoulderR": [
-        783,
-        260
+        818,
+        277
       ],
       "waistL": [
         225,
-        516
+        556
       ],
       "waistR": [
-        630,
-        516
+        668,
+        556
       ],
       "hemL": [
-        105.7,
-        933
+        201.7,
+        995
       ],
       "hemR": [
-        562.8,
-        933
+        691.8,
+        995
       ]
     },
     "meta": {
       "sleeves": "half",
+      "length": "hip"
+    }
+  },
+  {
+    "id": "tshirt-polo-collared",
+    "category": "tshirt",
+    "image": "/garments/tshirt-polo-collared.png",
+    "anchors": {
+      "shoulderL": [
+        64,
+        269
+      ],
+      "shoulderR": [
+        705,
+        269
+      ],
+      "waistL": [
+        183,
+        571
+      ],
+      "waistR": [
+        586,
+        571
+      ],
+      "hemL": [
+        164,
+        996
+      ],
+      "hemR": [
+        605.1,
+        996
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "hip"
+    },
+    "back": {
+      "image": "/garments/tshirt-polo-collared-back.png",
+      "anchors": {
+        "shoulderL": [
+          76,
+          250
+        ],
+        "shoulderR": [
+          675,
+          250
+        ],
+        "waistL": [
+          176,
+          529
+        ],
+        "waistR": [
+          576,
+          529
+        ],
+        "hemL": [
+          179,
+          904
+        ],
+        "hemR": [
+          572.9,
+          904
+        ]
+      }
+    }
+  },
+  {
+    "id": "tshirt-yellow-vneck",
+    "category": "tshirt",
+    "image": "/garments/tshirt-yellow-vneck.png",
+    "anchors": {
+      "shoulderL": [
+        48,
+        230
+      ],
+      "shoulderR": [
+        703,
+        230
+      ],
+      "waistL": [
+        174,
+        491
+      ],
+      "waistR": [
+        577,
+        491
+      ],
+      "hemL": [
+        170.2,
+        824
+      ],
+      "hemR": [
+        581.2,
+        824
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "hip"
+    },
+    "back": {
+      "image": "/garments/tshirt-yellow-vneck-back.png",
+      "anchors": {
+        "shoulderL": [
+          50,
+          221
+        ],
+        "shoulderR": [
+          635,
+          221
+        ],
+        "waistL": [
+          175,
+          458
+        ],
+        "waistR": [
+          510,
+          458
+        ],
+        "hemL": [
+          161.9,
+          795
+        ],
+        "hemR": [
+          522.9,
+          795
+        ]
+      }
+    }
+  },
+  {
+    "id": "kurti-flare-sleeve",
+    "category": "kurti",
+    "image": "/garments/kurti-flare-sleeve.png",
+    "anchors": {
+      "shoulderL": [
+        248,
+        196
+      ],
+      "shoulderR": [
+        711,
+        196
+      ],
+      "waistL": [
+        289,
+        614
+      ],
+      "waistR": [
+        665,
+        614
+      ],
+      "hemL": [
+        319,
+        703
+      ],
+      "hemR": [
+        635,
+        703
+      ]
+    },
+    "meta": {
+      "sleeves": "full",
       "length": "hip"
     }
   },
@@ -621,28 +900,28 @@
     "image": "/garments/kurti-floral-printed-02.png",
     "anchors": {
       "shoulderL": [
-        137,
-        99
+        77,
+        259
       ],
       "shoulderR": [
-        481,
-        99
+        473,
+        259
       ],
       "waistL": [
-        144.7,
-        439
+        104,
+        476
       ],
       "waistR": [
-        489.2,
-        439
+        446,
+        476
       ],
       "hemL": [
-        151,
-        718
+        77,
+        950
       ],
       "hemR": [
-        495.9,
-        718
+        474.5,
+        950
       ]
     },
     "meta": {
@@ -656,28 +935,28 @@
     "image": "/garments/kurti-floral-printed-01.png",
     "anchors": {
       "shoulderL": [
-        162,
-        268
+        66,
+        280
       ],
       "shoulderR": [
-        555,
-        268
+        549,
+        280
       ],
       "waistL": [
-        159,
-        423
+        72.4,
+        747
       ],
       "waistR": [
-        503,
-        423
+        546.5,
+        747
       ],
       "hemL": [
-        191.4,
-        1064
+        77.7,
+        1129
       ],
       "hemR": [
-        562.6,
-        1064
+        544.5,
+        1129
       ]
     },
     "meta": {
@@ -691,33 +970,412 @@
     "image": "/garments/kurti-motifs-printed.png",
     "anchors": {
       "shoulderL": [
-        102,
-        200
+        57,
+        263
       ],
       "shoulderR": [
-        517,
-        200
+        537,
+        263
       ],
       "waistL": [
-        143,
-        368
+        51.8,
+        672
       ],
       "waistR": [
-        472,
-        368
+        543.7,
+        672
       ],
       "hemL": [
-        62.6,
-        1063
+        47.5,
+        1007
       ],
       "hemR": [
-        530.2,
-        1063
+        549.2,
+        1007
       ]
     },
     "meta": {
       "sleeves": "half",
       "length": "knee"
+    }
+  },
+  {
+    "id": "kurti-white-short",
+    "category": "kurti",
+    "image": "/garments/kurti-white-short.png",
+    "anchors": {
+      "shoulderL": [
+        95,
+        252
+      ],
+      "shoulderR": [
+        638,
+        252
+      ],
+      "waistL": [
+        122,
+        703
+      ],
+      "waistR": [
+        608,
+        703
+      ],
+      "hemL": [
+        189.6,
+        917
+      ],
+      "hemR": [
+        547,
+        917
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "knee"
+    },
+    "back": {
+      "image": "/garments/kurti-white-short-back.png",
+      "anchors": {
+        "shoulderL": [
+          82,
+          268
+        ],
+        "shoulderR": [
+          648,
+          268
+        ],
+        "waistL": [
+          132,
+          737
+        ],
+        "waistR": [
+          597,
+          737
+        ],
+        "hemL": [
+          143.1,
+          972
+        ],
+        "hemR": [
+          586.1,
+          972
+        ]
+      }
+    }
+  },
+  {
+    "id": "lehenga-embroidered",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-embroidered.png",
+    "anchors": {
+      "shoulderL": [
+        197,
+        323
+      ],
+      "shoulderR": [
+        619,
+        323
+      ],
+      "waistL": [
+        256,
+        451
+      ],
+      "waistR": [
+        588,
+        451
+      ],
+      "hemL": [
+        155.9,
+        1171
+      ],
+      "hemR": [
+        622.7,
+        1171
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "lehenga-kushal-printed",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-kushal-printed.png",
+    "anchors": {
+      "shoulderL": [
+        188,
+        187
+      ],
+      "shoulderR": [
+        703,
+        187
+      ],
+      "waistL": [
+        570,
+        356
+      ],
+      "waistR": [
+        575,
+        356
+      ],
+      "hemL": [
+        231.9,
+        1107
+      ],
+      "hemR": [
+        662.9,
+        1107
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "lehenga-sharara",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-sharara.png",
+    "anchors": {
+      "shoulderL": [
+        155,
+        120
+      ],
+      "shoulderR": [
+        379,
+        120
+      ],
+      "waistL": [
+        222,
+        290
+      ],
+      "waistR": [
+        309,
+        290
+      ],
+      "hemL": [
+        127.9,
+        999
+      ],
+      "hemR": [
+        426.1,
+        999
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "lehenga-yellow",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-yellow.png",
+    "anchors": {
+      "shoulderL": [
+        286,
+        267
+      ],
+      "shoulderR": [
+        656,
+        267
+      ],
+      "waistL": [
+        409,
+        869
+      ],
+      "waistR": [
+        461,
+        869
+      ],
+      "hemL": [
+        367,
+        961
+      ],
+      "hemR": [
+        599.3,
+        961
+      ]
+    },
+    "meta": {
+      "sleeves": "sleeveless",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "lehenga-pink",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-pink.png",
+    "anchors": {
+      "shoulderL": [
+        164,
+        213
+      ],
+      "shoulderR": [
+        494,
+        213
+      ],
+      "waistL": [
+        248,
+        276
+      ],
+      "waistR": [
+        416,
+        276
+      ],
+      "hemL": [
+        157.6,
+        985
+      ],
+      "hemR": [
+        508,
+        985
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "lehenga-printed",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-printed.png",
+    "anchors": {
+      "shoulderL": [
+        28,
+        205
+      ],
+      "shoulderR": [
+        725,
+        205
+      ],
+      "waistL": [
+        234,
+        491
+      ],
+      "waistR": [
+        519,
+        491
+      ],
+      "hemL": [
+        221.9,
+        961
+      ],
+      "hemR": [
+        542.9,
+        961
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "lehenga-sangria",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-sangria.png",
+    "anchors": {
+      "shoulderL": [
+        160,
+        228
+      ],
+      "shoulderR": [
+        520,
+        228
+      ],
+      "waistL": [
+        243,
+        280
+      ],
+      "waistR": [
+        439,
+        280
+      ],
+      "hemL": [
+        122.7,
+        1003
+      ],
+      "hemR": [
+        553.7,
+        1003
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "lehenga-sequined",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-sequined.png",
+    "anchors": {
+      "shoulderL": [
+        155,
+        205
+      ],
+      "shoulderR": [
+        512,
+        205
+      ],
+      "waistL": [
+        143,
+        269
+      ],
+      "waistR": [
+        312,
+        269
+      ],
+      "hemL": [
+        148,
+        1003
+      ],
+      "hemR": [
+        524.4,
+        1003
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
+    }
+  },
+  {
+    "id": "lehenga-puff-sleeve",
+    "category": "lehenga-choli",
+    "image": "/garments/lehenga-puff-sleeve.png",
+    "anchors": {
+      "shoulderL": [
+        170,
+        257
+      ],
+      "shoulderR": [
+        505,
+        257
+      ],
+      "waistL": [
+        251,
+        294
+      ],
+      "waistR": [
+        350,
+        294
+      ],
+      "hemL": [
+        152.4,
+        1008
+      ],
+      "hemR": [
+        531.3,
+        1008
+      ]
+    },
+    "meta": {
+      "sleeves": "half",
+      "length": "ankle"
     }
   }
 ]

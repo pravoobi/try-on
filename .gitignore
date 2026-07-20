@@ -9,6 +9,7 @@ CLAUDE.md
 # (extract-worn-garments.mjs / garment-contact-sheet.mjs). The cutout PNGs
 # they produce in public/garments/ ARE tracked; these intermediates aren't.
 tools/extracted-garments.json
+tools/flat-garments.json
 tools/contact-sheet.png
 
 # fetched binaries — re-fetch with `npm run fetch-models`
