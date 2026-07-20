@@ -27,15 +27,45 @@ priority of the embeddable widget below.
    ingested (8 trousers, 3 shorts, 2 shirts, 1 tee, 4 kurtis), the 6
    procedural placeholders deleted. Catalog is now 21 real garments.
 
-   **Which tool to use:** `tools/extract-worn-garments.mjs` for ON-MODEL
-   photos (runs MODNet + SegFormer in Node and strips the wearer);
-   `tools/process-new-garments.mjs` only for flat-lay/hanger shots (flood-fill
-   background key, no person removal — a worn photo survives the key intact).
+   **Rebuilt again 2026-07-20** from flat/ghost-mannequin photography —
+   38 garments now (14 pants, 9 lehenga-choli, 6 kurti, 3 shirt, 3 tshirt,
+   3 dress).
+
+   **Which tool to use — this is the fork that matters:**
+   - `tools/build-flat-garments.mjs` — flat-lay, hanger, or ghost-mannequin
+     shots with NO person. Keys the background; no models needed.
+   - `tools/extract-worn-garments.mjs` — ON-MODEL shots. Runs MODNet +
+     SegFormer to strip the wearer, and needs a target ('upper'/'lower')
+     because a worn photo always contains both halves of an outfit.
+   - `tools/process-new-garments.mjs` — the original flood-fill keyer,
+     superseded by build-flat-garments for anything catalog-bound.
+
    Review every batch with `tools/garment-contact-sheet.mjs`, which
    composites cutouts over magenta with anchor dots: a cutout reviewed on
    white or a light checkerboard hides precisely the failures worth finding.
 
-   **Photo requirements learned the hard way** — 9 of 26 were unusable:
+   **Keying a flat photo: colour vs ML.** The flood-fill keyer decides by
+   colour distance from the backdrop, so it cannot separate a WHITE garment
+   from a WHITE sweep — a white kurti came out in fragments, white denim
+   shorts took a gash, pale cholis vanished. Those garments set
+   `keyer: 'ml'` in the manifest to matte with MODNet instead (learned
+   salient foreground, not colour). Rule of thumb: light garment on a light
+   background → `ml`; everything else → the fast colour path.
+
+   **Detached garment parts are normal.** A lehenga-choli photographed flat
+   has the choli floating clear above the skirt. Speck-pruning must drop
+   only components that are insignificant next to the largest (2% here),
+   never "keep exactly one" — that silently deletes the choli and looks
+   like a keying failure.
+
+   **Flat photography is markedly easier to ingest than on-model.** The
+   on-model batch lost 9 of 26 to hair and hands being subtracted as
+   separate classes; the flat batch lost 1 of 35, and that one only because
+   the frame also contained the model's jeans (two garments in one photo
+   needs semantic parsing, not keying). Prefer flat/ghost-mannequin sources.
+
+   **Photo requirements for ON-MODEL sources** — learned when 9 of 26 were
+   unusable:
    - **Arms away from the garment.** Hands on hips or in pockets get
      labelled `Left-arm`/`Right-arm` and subtracted, biting notches out of
      the silhouette. Interior holes are auto-filled now, but damage that
