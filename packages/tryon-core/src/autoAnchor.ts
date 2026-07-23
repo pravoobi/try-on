@@ -72,7 +72,7 @@ function rowExtents(alphaData: Uint8ClampedArray, w: number, h: number, threshol
 
 export interface SuggestAnchorsOptions {
   alphaThreshold?: number;
-  /** Fraction of the bbox height searched for the shoulder (max-width) row, from the top. */
+  /** Fraction of the bbox height searched for the shoulder seam, from the top. */
   shoulderBandFrac?: number;
   /** Fraction of the bbox height averaged for the hem, from the bottom. */
   hemBandFrac?: number;
@@ -80,14 +80,27 @@ export interface SuggestAnchorsOptions {
   waistTaperThreshold?: number;
   /** Fallback waist position, as a fraction from shoulder to hem, when there's no real taper. */
   waistFallbackT?: number;
+  /**
+   * Shoulder-seam detection: the shoulder row is the first one, scanning
+   * from the top, whose width reaches this fraction of the median width of
+   * the upper band (top `shoulderBandFrac` of the garment). This finds
+   * where the narrow neckline/collar has opened out to roughly body width —
+   * robust both to the garment continuing to widen below (a ghost-mannequin
+   * top, which broke "widest row") and to a collar tip creating a fast
+   * emergence at the very top (which broke slope detection). Lower =
+   * triggers higher up (safer: a small collar bit above the anchor warps
+   * mildly, far better than the whole neck warping over the face).
+   */
+  shoulderReachFrac?: number;
 }
 
 const DEFAULTS: Required<SuggestAnchorsOptions> = {
   alphaThreshold: 10,
-  shoulderBandFrac: 0.25,
+  shoulderBandFrac: 0.4,
   hemBandFrac: 0.06,
   waistTaperThreshold: 0.9,
   waistFallbackT: 0.55,
+  shoulderReachFrac: 0.8,
 };
 
 /** Suggests a 6-anchor GarmentAnchors set from a matted image's alpha channel, or null if the image is empty. */
@@ -104,21 +117,41 @@ export function suggestAnchors(
   if (bboxH <= 0) return null;
   const rows = rowExtents(alphaData, w, h, opts.alphaThreshold);
 
-  // Shoulders: widest row within the top band.
+  // Shoulders: the seam where the narrow neckline/collar has opened out to
+  // roughly the body's width. The old "widest row in the top band" placed
+  // the anchor at the width peak, but a ghost-mannequin top (and any
+  // gathered/flared silhouette) keeps widening monotonically well past the
+  // shoulders, so the peak sat a quarter of the way down and the empty
+  // neck/collar above it warped up over the wearer's face.
+  //
+  // Instead: take the median width of the upper band as a body-width
+  // reference, then walk down from the top and stop at the first row that
+  // reaches shoulderReachFrac of it. That fires at the shoulder line
+  // regardless of how much wider the body/sleeves/skirt get below, and —
+  // unlike a slope test — isn't fooled by a collar tip's fast emergence at
+  // the very top edge.
   const shoulderBandEnd = Math.min(bbox.maxY, bbox.minY + Math.round(bboxH * opts.shoulderBandFrac));
+  const bandWidths: number[] = [];
+  for (let y = bbox.minY; y <= shoulderBandEnd; y++) {
+    const r = rows[y];
+    if (r) bandWidths.push(r[1] - r[0]);
+  }
+  bandWidths.sort((a, b) => a - b);
+  const bandMedian = bandWidths.length ? bandWidths[bandWidths.length >> 1] : 0;
+  const shoulderTarget = bandMedian * opts.shoulderReachFrac;
+
   let shoulderY = bbox.minY;
-  let shoulderWidth = -1;
   for (let y = bbox.minY; y <= shoulderBandEnd; y++) {
     const r = rows[y];
     if (!r) continue;
-    const width = r[1] - r[0];
-    if (width > shoulderWidth) {
-      shoulderWidth = width;
+    if (r[1] - r[0] >= shoulderTarget) {
       shoulderY = y;
+      break;
     }
   }
   const shoulderRow = rows[shoulderY];
   if (!shoulderRow) return null; // shouldn't happen: bbox.minY row is always non-empty by construction.
+  const shoulderWidth = shoulderRow[1] - shoulderRow[0];
 
   // Hem: average the bottom band's rows, robust against a single stray pixel.
   const hemBandStart = Math.max(bbox.minY, bbox.maxY - Math.round(bboxH * opts.hemBandFrac));
@@ -136,10 +169,13 @@ export function suggestAnchors(
   const hemL_x = hemCount > 0 ? hemMinSum / hemCount : shoulderRow[0];
   const hemR_x = hemCount > 0 ? hemMaxSum / hemCount : shoulderRow[1];
 
-  // Waist: narrowest row strictly between the shoulder and hem bands.
+  // Waist: narrowest row between the shoulder seam and the hem band. Starts
+  // below the shoulder (plus a small margin so the search doesn't begin
+  // right at the seam), not at the fixed shoulder-search limit.
+  const waistSearchStart = Math.min(hemBandStart - 1, shoulderY + Math.round(bboxH * 0.1));
   let waistY = -1;
   let waistWidth = Infinity;
-  for (let y = shoulderBandEnd + 1; y < hemBandStart; y++) {
+  for (let y = waistSearchStart; y < hemBandStart; y++) {
     const r = rows[y];
     if (!r) continue;
     const width = r[1] - r[0];
