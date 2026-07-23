@@ -411,6 +411,82 @@ function keepSignificantComponents(data, w, h, threshold = 100, minFracOfLargest
   }
 }
 
+/**
+ * Refines a lehenga-choli's waist (and hem) anchors after the generic top
+ * heuristic. A lehenga is a fitted choli over a dramatically flaring skirt,
+ * and in a flat photo the two are often disconnected by a bare-midriff gap.
+ * The generic "narrowest row = waist" then lands the waist either in that
+ * empty gap or at the choli's tapered bottom point (a few px wide), which
+ * collapses the torso to a pinch when warped.
+ *
+ * Instead, put the waist at the SKIRT WAISTBAND — the top of the skirt,
+ * where it's gathered onto the body. Found by scanning up from the skirt's
+ * widest row until the silhouette either breaks (the gap) or starts
+ * widening again (back into the choli); the last solid skirt row before
+ * that is the waistband, and its full width gives a real (non-degenerate)
+ * waist. The hem is re-taken as the skirt's widest row rather than the very
+ * bottom edge, which on these photos often tapers in (a gathered hem) or
+ * carries a dupatta tail.
+ */
+function refineLehengaAnchors(rgba, w, h, anchors) {
+  const T = 10;
+  const rowW = (y) => {
+    let mn = -1, mx = -1;
+    for (let x = 0; x < w; x++) {
+      if (rgba[(y * w + x) * 4 + 3] > T) { if (mn < 0) mn = x; mx = x; }
+    }
+    return mn < 0 ? { w: 0, mn: 0, mx: 0 } : { w: mx - mn, mn, mx };
+  };
+  let minY = 0;
+  while (minY < h && rowW(minY).w === 0) minY++;
+  let maxY = h - 1;
+  while (maxY > 0 && rowW(maxY).w === 0) maxY--;
+
+  const shoulderY = Math.round(anchors.shoulderL[1]);
+  // Widest row overall = the skirt at its fullest.
+  let skirtMaxY = shoulderY, skirtMax = -1;
+  for (let y = shoulderY; y <= maxY; y++) {
+    const r = rowW(y).w;
+    if (r > skirtMax) { skirtMax = r; skirtMaxY = y; }
+  }
+  // Scan up from the skirt's widest toward the waistband: stop at a gap
+  // (width 0) or where the silhouette starts widening again going up (the
+  // choli). The waistband is the last solid row before that.
+  let waistY = skirtMaxY;
+  let prev = rowW(skirtMaxY).w;
+  for (let y = skirtMaxY - 1; y > shoulderY; y--) {
+    const cur = rowW(y).w;
+    if (cur === 0) break; // hit the midriff gap
+    if (cur > prev + 4) break; // widening back into the choli
+    waistY = y;
+    prev = cur;
+  }
+  const waistRow = rowW(waistY);
+  const hemRow = rowW(skirtMaxY);
+
+  // Guard against a degenerate waist: a tapered choli tip or a narrow
+  // gathered waistband can leave waistL/R almost coincident, which pinches
+  // the torso to a point when warped. Keep the waist at least ~0.7x the
+  // shoulder span, centered on the waistband row's own midpoint.
+  const shoulderW = anchors.shoulderR[0] - anchors.shoulderL[0];
+  let waistL = waistRow.mn;
+  let waistR = waistRow.mx;
+  const minWaistW = shoulderW * 0.7;
+  if (waistR - waistL < minWaistW) {
+    const cx = (waistL + waistR) / 2;
+    waistL = cx - minWaistW / 2;
+    waistR = cx + minWaistW / 2;
+  }
+
+  return {
+    ...anchors,
+    waistL: [waistL, waistY],
+    waistR: [waistR, waistY],
+    hemL: [hemRow.mn, skirtMaxY],
+    hemR: [hemRow.mx, skirtMaxY],
+  };
+}
+
 function cropToAlphaBBox(rgba, width, height, marginFrac = 0.04) {
   let minX = width, minY = height, maxX = -1, maxY = -1;
   for (let y = 0; y < height; y++) {
@@ -513,13 +589,16 @@ for (const g of selected) {
       continue;
     }
     const { cropped, kept } = front;
-    const anchors =
+    let anchors =
       g.category === 'pants'
         ? suggestPantsAnchors(cropped.rgba, cropped.width, cropped.height)
         : suggestAnchors(cropped.rgba, cropped.width, cropped.height);
     if (!anchors) {
       problems.push(`${g.id}: could not suggest anchors`);
       continue;
+    }
+    if (g.category === 'lehenga-choli') {
+      anchors = refineLehengaAnchors(cropped.rgba, cropped.width, cropped.height, anchors);
     }
 
     const file = `${g.id}.png`;
