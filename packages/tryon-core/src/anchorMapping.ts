@@ -359,9 +359,19 @@ function lerpPoint(a: Point, b: Point, t: number): Point {
   return [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
 }
 
+/** Unit vector from a→b, or null if the two points coincide. */
+function unit(a: Point, b: Point): [Point, number] | null {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-3) return null;
+  return [[dx / len, dy / len], len];
+}
+
 export function anchorCorrespondences(
   garment: GarmentAnchors,
   body: BodyAnchors,
+  sleeveFlareRatio = 0,
 ): { src: Point[]; dst: Point[] } {
   const src: Point[] = ANCHOR_NAMES.map((n) => garment[n]);
   const dst: Point[] = ANCHOR_NAMES.map((n) => body[n]);
@@ -388,6 +398,46 @@ export function anchorCorrespondences(
   };
   capPin('shoulderL', 'elbowL');
   capPin('shoulderR', 'elbowR');
+
+  // Bell/flared-sleeve cuff width. The cuff correspondence above pins only
+  // the CENTER of the sleeve opening to the arm's centerline; with every
+  // other sleeve anchor also on the centerline, the single-surface TPS is
+  // free to shrink the sleeve's width to match however much the centerline
+  // compresses onto the (thin) arm — a bell sleeve collapses onto the wrist.
+  // For a flared sleeve, synthesize a pair of cuff-edge correspondences
+  // offset perpendicular to the arm axis, holding the opening open. The
+  // offset is the SAME fraction of each side's own sleeve length on the
+  // garment and the body, so it reproduces the garment's own flare aspect
+  // ratio and depends only on the tracked arm's length — not its pose.
+  const flareCuff = (
+    proximal: 'shoulderL' | 'shoulderR',
+    elbow: 'elbowL' | 'elbowR',
+    cuff: 'cuffL' | 'cuffR',
+  ) => {
+    if (sleeveFlareRatio <= 0) return;
+    const gCuff = garment[cuff];
+    const bCuff = body[cuff];
+    if (!gCuff || !bCuff) return;
+    // Proximal reference: the sleeve's own elbow when annotated/tracked (full
+    // sleeve), else the shoulder (a half sleeve ends above the elbow).
+    const gProx = garment[elbow] ?? garment[proximal];
+    const bProx = body[elbow] ?? body[proximal];
+    const g = unit(gProx, gCuff);
+    const b = unit(bProx, bCuff);
+    if (!g || !b) return;
+    const [[gux, guy], gLen] = g;
+    const [[bux, buy], bLen] = b;
+    const gHalf = gLen * sleeveFlareRatio;
+    const bHalf = bLen * sleeveFlareRatio;
+    // Perpendicular to each axis (rotate +90°). Both axes run proximal→cuff,
+    // so the same rotation picks the anatomically-corresponding edge on each.
+    for (const sgn of [1, -1] as const) {
+      src.push([gCuff[0] + sgn * -guy * gHalf, gCuff[1] + sgn * gux * gHalf]);
+      dst.push([bCuff[0] + sgn * -buy * bHalf, bCuff[1] + sgn * bux * bHalf]);
+    }
+  };
+  flareCuff('shoulderL', 'elbowL', 'cuffL');
+  flareCuff('shoulderR', 'elbowR', 'cuffR');
   return { src, dst };
 }
 

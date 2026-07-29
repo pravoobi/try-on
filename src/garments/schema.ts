@@ -18,6 +18,7 @@ import {
   type HemLength,
   type SkirtAnchorName,
   type SkirtAnchors,
+  type SleeveFlare,
 } from '@practics/tryon-core';
 
 export const GARMENT_CATEGORIES = ['kurti', 'dress', 'top', 'shirt', 'tshirt', 'pants', 'lehenga-choli', 'saree'] as const;
@@ -31,9 +32,19 @@ export type SleeveLength = (typeof SLEEVE_LENGTHS)[number];
 
 export const HEM_LENGTHS = ['hip', 'knee', 'ankle'] as const satisfies readonly HemLength[];
 
+export const SLEEVE_FLARES = ['fitted', 'bell'] as const satisfies readonly SleeveFlare[];
+
 export interface GarmentMeta {
   sleeves: SleeveLength;
   length: HemLength;
+  /**
+   * Cuff flare (see tryon-core SleeveFlare): 'bell' for a flared/kimono
+   * sleeve whose cuff hangs wider than the wrist, so the warp holds its
+   * width open instead of collapsing it onto the arm. Optional; absent =
+   * 'fitted' (an ordinary arm-wrapping sleeve). Only matters when the
+   * garment also carries sleeve anchors.
+   */
+  sleeveFlare?: SleeveFlare;
 }
 
 /** A single-image garment piece using the full 6-anchor set (shoulder/waist/hem). */
@@ -187,7 +198,15 @@ function validateMeta(v: unknown, path: string): GarmentMeta {
   if (!HEM_LENGTHS.includes(obj.length as HemLength)) {
     fail(path, `meta.length must be one of ${HEM_LENGTHS.join(', ')}`);
   }
-  return { sleeves: obj.sleeves as SleeveLength, length: obj.length as HemLength };
+  // sleeveFlare is optional (absent = 'fitted'); a present value must be valid.
+  if (obj.sleeveFlare !== undefined && !SLEEVE_FLARES.includes(obj.sleeveFlare as SleeveFlare)) {
+    fail(path, `meta.sleeveFlare must be one of ${SLEEVE_FLARES.join(', ')}`);
+  }
+  return {
+    sleeves: obj.sleeves as SleeveLength,
+    length: obj.length as HemLength,
+    ...(obj.sleeveFlare !== undefined ? { sleeveFlare: obj.sleeveFlare as SleeveFlare } : {}),
+  };
 }
 
 function validateImagePath(v: unknown, path: string): string {

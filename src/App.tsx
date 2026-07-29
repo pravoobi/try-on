@@ -704,6 +704,7 @@ export default function App() {
         anchors: useBack ? mirrorAnchorsLR(back!.anchors) : selectedTop.anchors,
         hemLength: selectedTop.meta.length,
         sleeves: selectedTop.meta.sleeves,
+        sleeveFlare: selectedTop.meta.sleeveFlare,
         // A one-image lehenga rides this single-piece path but must keep the
         // skirt's dramatic flare (see tryon-core HemFlare).
         hemFlare: selectedTop.category === 'lehenga-choli' ? 'skirt' : 'dress',

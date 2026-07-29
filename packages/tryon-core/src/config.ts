@@ -10,7 +10,7 @@
 import type { GarmentExtractOptions } from './garmentExtract.js';
 import type { SwipeConfig } from './gesture.js';
 import type { OrientationConfig } from './orientation.js';
-import type { HemLength } from './types.js';
+import type { HemLength, SleeveFlare } from './types.js';
 import type { WarpGridOptions } from 'thin-plate-spline';
 
 export interface AnchorConfig {
@@ -46,6 +46,17 @@ export interface AnchorConfig {
      * 0.5 ≈ tolerate up to a 60° bend.
      */
     minStraightness: number;
+    /**
+     * Cuff half-width per SleeveFlare kind, as a fraction of the sleeve's
+     * own length (shoulder→cuff for half sleeves, elbow→cuff for full). A
+     * 'bell' sleeve synthesizes cuff-edge anchors offset this far to each
+     * side of the arm axis so its width survives the warp; 'fitted' is 0 —
+     * no width anchor, the cuff tracks the arm centerline exactly as before
+     * (see anchorMapping.ts anchorCorrespondences). Applied identically on
+     * the garment and body sides, so it preserves the garment's own
+     * flare aspect ratio and stays independent of the wearer's pose.
+     */
+    sleeveFlare: Record<SleeveFlare, number>;
   };
 }
 
@@ -125,7 +136,7 @@ export const DEFAULT_CONFIG: TryOnConfig = {
     dressFlare: { hip: 1, knee: 1.2, ankle: 1.35 },
     stanceCoverMargin: 0.25,
     stanceScoreSoftBand: 0.15,
-    sleeve: { halfCuffT: 0.6, fullCuffT: 0.85, minStraightness: 0.5 },
+    sleeve: { halfCuffT: 0.6, fullCuffT: 0.85, minStraightness: 0.5, sleeveFlare: { fitted: 0, bell: 0.4 } },
   },
   relighting: {
     bboxMarginFrac: 0.15,

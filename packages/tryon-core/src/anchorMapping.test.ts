@@ -239,6 +239,45 @@ describe('anchorCorrespondences', () => {
     expect(pinDst[0]).toBeCloseTo(10 + (150 - 10) * 0.35, 6);
     expect(pinDst[1]).toBeCloseTo(0 + (250 - 0) * 0.35, 6);
   });
+
+  it('adds no cuff-flare points at ratio 0 (a fitted sleeve is unchanged)', () => {
+    const withElbows: GarmentAnchors = { ...garment, elbowL: [8, 40] };
+    const body: GarmentAnchors = { ...ANCHORS, elbowL: [200, 250], cuffL: [200, 350] };
+    const noFlare = anchorCorrespondences(withElbows, body);
+    const zeroFlare = anchorCorrespondences(withElbows, body, 0);
+    // 6 base + elbowL + cuffL + capPinL, no width pairs.
+    expect(noFlare.src).toHaveLength(9);
+    expect(zeroFlare.src).toEqual(noFlare.src);
+  });
+
+  it('flares a bell cuff into a perpendicular pair, scaled per-side by sleeve length', () => {
+    // Vertical arms make the perpendicular exactly horizontal, so the width
+    // offset is a plain ±x from the cuff center.
+    const garmentBell: GarmentAnchors = { ...ANCHORS, elbowL: [10, 40], cuffL: [10, 80] };
+    const body: GarmentAnchors = { ...ANCHORS, elbowL: [200, 250], cuffL: [200, 350] };
+    const { src, dst } = anchorCorrespondences(garmentBell, body, 0.5);
+    // 6 base + elbowL + cuffL + capPinL + 2 flare-cuff = 11.
+    expect(src).toHaveLength(11);
+    // Garment sleeve length 40 → half-width 20 either side of cuff x=10.
+    expect(src[9]).toEqual([-10, 80]);
+    expect(src[10]).toEqual([30, 80]);
+    // Body sleeve length 100 → half-width 50 either side of cuff x=200.
+    expect(dst[9]).toEqual([150, 350]);
+    expect(dst[10]).toEqual([250, 350]);
+  });
+
+  it('uses the shoulder as the flare reference for a half sleeve (no elbow anchor)', () => {
+    // No elbow anywhere: the perpendicular is taken off shoulder→cuff instead.
+    const garmentHalf: GarmentAnchors = { ...ANCHORS, shoulderL: [10, 0], cuffL: [10, 40] };
+    const body: GarmentAnchors = { ...ANCHORS, shoulderL: [200, 100], cuffL: [200, 200] };
+    const { src, dst } = anchorCorrespondences(garmentHalf, body, 0.5);
+    // 6 base + cuffL (no elbow → no cap pin) + 2 flare-cuff = 9.
+    expect(src).toHaveLength(9);
+    expect(src[7]).toEqual([-10, 40]); // garment shoulder→cuff length 40 → ±20
+    expect(src[8]).toEqual([30, 40]);
+    expect(dst[7]).toEqual([150, 200]); // body shoulder→cuff length 100 → ±50
+    expect(dst[8]).toEqual([250, 200]);
+  });
 });
 
 describe('foreshortenAnchors', () => {

@@ -1223,41 +1223,6 @@
     }
   },
   {
-    "id": "lehenga-printed",
-    "category": "lehenga-choli",
-    "image": "/garments/lehenga-printed.png",
-    "anchors": {
-      "shoulderL": [
-        99,
-        48
-      ],
-      "shoulderR": [
-        654,
-        48
-      ],
-      "waistL": [
-        97,
-        49
-      ],
-      "waistR": [
-        656,
-        49
-      ],
-      "hemL": [
-        28,
-        205
-      ],
-      "hemR": [
-        725,
-        205
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "ankle"
-    }
-  },
-  {
     "id": "lehenga-sangria",
     "category": "lehenga-choli",
     "image": "/garments/lehenga-sangria.png",
@@ -1320,41 +1285,6 @@
       "hemR": [
         640,
         909
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "lehenga-puff-sleeve",
-    "category": "lehenga-choli",
-    "image": "/garments/lehenga-puff-sleeve.png",
-    "anchors": {
-      "shoulderL": [
-        236,
-        91
-      ],
-      "shoulderR": [
-        427,
-        91
-      ],
-      "waistL": [
-        230.2,
-        284
-      ],
-      "waistR": [
-        363.9,
-        284
-      ],
-      "hemL": [
-        25,
-        892
-      ],
-      "hemR": [
-        646,
-        892
       ]
     },
     "meta": {

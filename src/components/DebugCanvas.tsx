@@ -13,6 +13,7 @@ import {
   type PartialTryOnConfig,
   type PipelineResult,
   type SkirtAnchors,
+  type SleeveFlare,
   type SleeveLength,
   tintMask,
   type TryOnStatus,
@@ -51,6 +52,8 @@ export type GarmentOverlay =
         hemLength: HemLength;
         /** Enables arm-following sleeves when `anchors` carries sleeve anchors (see tryon-core SLEEVE_ANCHOR_NAMES). */
         sleeves?: SleeveLength;
+        /** 'bell' holds a flared sleeve's cuff open instead of collapsing it onto the arm (see tryon-core SleeveFlare). */
+        sleeveFlare?: SleeveFlare;
         /** 'skirt' for a single-image lehenga-choli (see tryon-core HemFlare). */
         hemFlare?: HemFlare;
         /** Advanced-mode normal map (Phase A3), same pixel space/coverage as `image`. */

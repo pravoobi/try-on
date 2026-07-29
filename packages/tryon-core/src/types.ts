@@ -105,6 +105,19 @@ export type SleeveLength = 'full' | 'half' | 'sleeveless';
 export type HemFlare = 'dress' | 'skirt';
 
 /**
+ * How dramatically a sleeve flares away from the arm at its cuff. 'fitted'
+ * is the default (a normal sleeve wraps the arm — its cuff tracks the arm's
+ * own centerline, no widening). 'bell' is a flared/bell/kimono sleeve whose
+ * cuff hangs well wider than the wrist: without a width correspondence the
+ * single-surface TPS collapses that width onto the arm line (see
+ * anchorMapping.ts anchorCorrespondences), so a bell sleeve synthesizes a
+ * pair of cuff-edge anchors offset perpendicular to the arm axis. The flare
+ * is a garment property, independent of pose — the exact widths live in
+ * config.anchors.sleeveFlare.
+ */
+export type SleeveFlare = 'fitted' | 'bell';
+
+/**
  * A skirt (the lehenga half of a lehenga-choli) has no shoulders — only a
  * waistband and a hem. Kept distinct from GarmentAnchors rather than faking
  * degenerate shoulder points through the 6-anchor shape.

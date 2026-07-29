@@ -37,6 +37,7 @@ import {
   type Keypoint,
   type Point,
   type SkirtAnchors,
+  type SleeveFlare,
   type SleeveLength,
 } from './types.js';
 
@@ -93,6 +94,15 @@ export interface OutfitTopPiece {
    * Omitted/'sleeveless' leaves sleeves in the product photo's pose.
    */
   sleeves?: SleeveLength;
+  /**
+   * Sleeve flare (see types.ts SleeveFlare) — 'bell' for a flared/kimono
+   * sleeve whose cuff hangs well wider than the wrist, so its width is held
+   * open by synthesized cuff-edge anchors instead of collapsing onto the arm
+   * (see anchorMapping.ts anchorCorrespondences). Defaults to 'fitted' (no
+   * widening). Only takes effect when the garment also carries sleeve anchors
+   * and the arm is tracked.
+   */
+  sleeveFlare?: SleeveFlare;
   /**
    * Hem flare (see types.ts HemFlare) — 'skirt' for a single-image
    * lehenga-choli or any ghagra-style garment whose own hem is far wider
@@ -213,7 +223,8 @@ export function renderOutfitTryOn(ctx: Canvas2DContext, input: OutfitTryOnInput)
   }
 
   if (top && topBody) {
-    const { src, dst } = anchorCorrespondences(top.anchors, topBody);
+    const sleeveFlareRatio = config.anchors.sleeve.sleeveFlare[top.sleeveFlare ?? 'fitted'];
+    const { src, dst } = anchorCorrespondences(top.anchors, topBody, sleeveFlareRatio);
     let layer = renderGarmentWarp(top.image, src, dst, w, h, warpGrid);
     if (top.normal) {
       const normalLayer = renderGarmentWarp(top.normal, src, dst, w, h, warpGrid);
