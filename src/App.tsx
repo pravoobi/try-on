@@ -6,6 +6,7 @@ import { GarmentPicker } from './components/GarmentPicker';
 import { GarmentUpload } from './components/GarmentUpload';
 import { LooksPanel } from './components/LooksPanel';
 import { PerfStats } from './components/PerfStats';
+import { ReactionBar } from './components/ReactionBar';
 import { snapshotCanvas } from './components/snapshotCanvas';
 import { config } from './config';
 import {
@@ -19,6 +20,7 @@ import {
 import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
 import { useLooks, type SavedLook } from './hooks/useLooks';
+import { useReaction } from './hooks/useReaction';
 import { useGestureSwipe } from './hooks/useGestureSwipe';
 import { useLiveDepth } from './hooks/useLiveDepth';
 import { useMatting } from './hooks/useMatting';
@@ -86,6 +88,7 @@ export default function App() {
   const catalog = useGarmentCatalog();
   const userGarments = useUserGarments();
   const looks = useLooks();
+  const reaction = useReaction();
   const webcam = useWebcam();
   const live = useLiveTryOn(pipeline, webcam.videoEl, mode === 'live');
   const [image, setImage] = useState<ImageBitmap | null>(null);
@@ -104,6 +107,13 @@ export default function App() {
   const [tryOnStatus, setTryOnStatus] = useState<TryOnStatus | null>(null);
   /** Transient notice from a save-look attempt (e.g. "nothing rendered yet"). */
   const [lookNotice, setLookNotice] = useState<string | null>(null);
+  /**
+   * Set (with a fresh `key`) whenever the WebMCP agent applies a try-on, so
+   * the preview visibly announces it — a manual picker tap doesn't fire this.
+   * Cleared a few seconds later by the effect below.
+   */
+  const [agentApply, setAgentApply] = useState<{ name: string; key: number } | null>(null);
+  const agentApplyKeyRef = useRef(0);
   /** The photo-mode composited canvas — snapshotted by `save_look`. */
   const photoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageRef = useRef<ImageBitmap | null>(null);
@@ -667,6 +677,8 @@ export default function App() {
     (g: Garment) => {
       setMode('photo');
       selectGarment(g, { toggle: false });
+      agentApplyKeyRef.current += 1;
+      setAgentApply({ name: g.meta.name ?? g.id, key: agentApplyKeyRef.current });
     },
     [selectGarment],
   );
@@ -711,7 +723,15 @@ export default function App() {
     looks: looks.looks,
     onSaveLook: captureLook,
     onCompareLooks: looks.setComparison,
+    onAwaitReaction: reaction.awaitNext,
   });
+
+  // Clear the "stylist applied X" banner a few seconds after it appears.
+  useEffect(() => {
+    if (!agentApply) return;
+    const t = setTimeout(() => setAgentApply(null), 3500);
+    return () => clearTimeout(t);
+  }, [agentApply]);
 
   // Live-mode front/back/fade decision (Phase A5) — a lehenga-choli never
   // has a back piece (schema.ts), so it always resolves hasBack=false and
@@ -949,7 +969,7 @@ export default function App() {
           {stylist.available && mode !== 'live' && (
             <p
               className="status webmcp-status"
-              title="This page exposes WebMCP tools an AI agent can call: search_catalog, apply_tryon, save_look, compare_looks"
+              title="This page exposes WebMCP tools an AI agent can call: search_catalog, apply_tryon, save_look, compare_looks, await_reaction"
             >
               <span className="webmcp-dot" aria-hidden /> AI stylist tools live
               {' — '}
@@ -959,6 +979,7 @@ export default function App() {
                   ['try-on', stylist.applyState.executionCount],
                   ['save', stylist.saveLookState.executionCount],
                   ['compare', stylist.compareLooksState.executionCount],
+                  ['reaction', stylist.awaitReactionState.executionCount],
                 ] as const
               ).map(([label, count], i) => (
                 <span key={label}>
@@ -1131,18 +1152,26 @@ export default function App() {
           {!isFullscreen && (
             <main>
               {displayImage ? (
-                <DebugCanvas
-                  ref={photoCanvasRef}
-                  image={displayImage}
-                  result={displayResult}
-                  showMask={showMask}
-                  showSkeleton={showSkeleton}
-                  garment={garmentOverlay}
-                  depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
-                  personDepthBitmap={mode === 'photo' ? photoDepth : liveDepth.depth}
-                  harmonize={showHarmonize}
-                  onTryOnStatus={setTryOnStatus}
-                />
+                <div className={'tryon-stage' + (agentApply ? ' agent-applied' : '')}>
+                  {/* Keyed so each agent apply remounts and replays the sweep. */}
+                  {agentApply && (
+                    <div className="agent-apply-flash" key={agentApply.key}>
+                      🎨 Stylist put you in <strong>{agentApply.name}</strong>
+                    </div>
+                  )}
+                  <DebugCanvas
+                    ref={photoCanvasRef}
+                    image={displayImage}
+                    result={displayResult}
+                    showMask={showMask}
+                    showSkeleton={showSkeleton}
+                    garment={garmentOverlay}
+                    depthBitmap={mode === 'photo' && showDepth ? photoDepth : null}
+                    personDepthBitmap={mode === 'photo' ? photoDepth : liveDepth.depth}
+                    harmonize={showHarmonize}
+                    onTryOnStatus={setTryOnStatus}
+                  />
+                </div>
               ) : (
                 <p className="hint">
                   {mode === 'photo'
@@ -1151,6 +1180,10 @@ export default function App() {
                 </p>
               )}
             </main>
+          )}
+
+          {mode === 'photo' && !isFullscreen && (selectedTop || selectedBottom) && (
+            <ReactionBar pending={reaction.pending} last={reaction.last} onReact={reaction.submit} />
           )}
 
           {mode === 'photo' && !isFullscreen && (

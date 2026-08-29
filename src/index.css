@@ -573,6 +573,136 @@ h1 {
   font-weight: 600;
 }
 
+/* Agent-apply announcement (WebMCP Day 4): a border sweep + banner when the
+   agent — not a manual picker tap — applies a try-on. */
+.tryon-stage {
+  position: relative;
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  border-radius: 8px;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  transition: outline-color 0.3s ease;
+}
+
+.tryon-stage.agent-applied {
+  outline-color: #38bdf8;
+  animation: agent-apply-glow 3.2s ease-out;
+}
+
+@keyframes agent-apply-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.55);
+  }
+  30% {
+    box-shadow: 0 0 34px 6px rgba(56, 189, 248, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+  }
+}
+
+.agent-apply-flash {
+  position: absolute;
+  top: 0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(8, 47, 73, 0.92);
+  border: 1px solid #38bdf8;
+  color: #e0f2fe;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  animation: agent-apply-flash 3.4s ease-out forwards;
+}
+
+@keyframes agent-apply-flash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  12%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+
+/* Structured reaction channel (WebMCP Day 4, see components/ReactionBar.tsx). */
+.reaction-bar {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #2b3140;
+  border-radius: 8px;
+  background: #14171e;
+}
+
+.reaction-bar.pending {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
+  animation: webmcp-pulse 1.6s ease-out infinite;
+}
+
+.reaction-bar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.reaction-chip {
+  font-size: 0.8rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+}
+
+.reaction-bar.pending .reaction-chip {
+  border-color: #38bdf8;
+}
+
+.reaction-chip-love:hover {
+  border-color: #fb7185;
+  color: #fecdd3;
+}
+
+.reaction-chip-like:hover {
+  border-color: #34d399;
+  color: #bbf7d0;
+}
+
+.reaction-chip-try_another:hover {
+  border-color: #fbbf24;
+  color: #fde68a;
+}
+
+.reaction-chip-reject:hover {
+  border-color: #9ca3af;
+  color: #e5e7eb;
+}
+
+.reaction-note {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  background: #0d1016;
+  border: 1px solid #2b3140;
+  border-radius: 6px;
+  color: inherit;
+}
+
+.reaction-last {
+  display: inline-block;
+  margin-top: 0.4rem;
+}
+
 @keyframes webmcp-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.5);

@@ -56,9 +56,13 @@ exists in `App.tsx` — no new business logic, just a callable entry point.
   (`src/hooks/useLooks.ts`); returns the new `look-N` id + the full id list.
 - `compare_looks({ lookIds })` → selects saved looks and opens the side-by-side
   comparison modal (`src/components/LooksPanel.tsx`); reports any missing ids.
+- `await_reaction({ timeoutSeconds? })` → blocks until the human taps a reaction
+  chip (Love it / Good / Try another / Not this) with an optional note, or times
+  out; returns `{ reaction, note, guidance }` (`src/hooks/useReaction.ts`).
 
-The looks tray + comparison are also human-drivable: a "＋ save current look"
-button and a per-card "compare" toggle run the same loop the agent does.
+The looks tray + comparison + reaction chips are also human-drivable: a
+"＋ save current look" button, a per-card "compare" toggle, and the reaction
+bar run the same loop the agent does.
 
 ## Day-by-day
 
@@ -85,11 +89,19 @@ button and a per-card "compare" toggle run the same loop the agent does.
       (save button + per-card compare toggle). Verified E2E in Chrome:
       search→apply→save→apply→save→compare renders both looks side by side;
       missing look ids reported, not errored.
-- [ ] **Day 4 (Mon, Aug 31)** — Polish the human-agent loop: visible
-      highlight/transition when the agent applies a try-on, and a way for
-      the agent to receive structured reaction ("like this one" / "try
-      another") rather than only free-text chat. This is explicitly part of
-      the judging criteria (quality of the human-agent experience).
+- [x] **Day 4 (Mon, Aug 31)** — Human-agent loop polish. (1) Visible apply:
+      when the *agent* (not a manual picker tap) applies a try-on, the
+      preview gets a border-sweep glow + a "🎨 Stylist put you in <name>"
+      banner (`.tryon-stage` / `.agent-apply-flash`), auto-clearing after
+      ~3.5s. (2) Structured reaction channel: `src/hooks/useReaction.ts` +
+      `src/components/ReactionBar.tsx` — four chips (Love it / Good / Try
+      another / Not this) + an optional note. New `await_reaction` tool
+      blocks the agent until the human taps a chip (or a fresh unconsumed
+      one exists), returning `{ reaction, note, guidance }`; the bar shows a
+      pulsing "the stylist is waiting for your reaction" state while blocked.
+      `apply_tryon`'s response now tells the agent to call `await_reaction`.
+      Verified E2E in Chrome: blocking + resolve, note passthrough,
+      fresh-reaction-returns-immediately, and timeout→`none`.
 - [ ] **Day 5 (Tue, Sep 1)** — Buffer + bug fixing. Confirm it works in
       ChatGPT's in-app browser as well as Chrome — both are how judges will
       actually test it.

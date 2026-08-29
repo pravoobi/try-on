@@ -11,12 +11,14 @@
  * where the browser doesn't ship it natively, and passes through to the
  * native implementation where it does.
  *
- * Tool surface: `search_catalog`, `apply_tryon`, `save_look`, `compare_looks`.
+ * Tool surface: `search_catalog`, `apply_tryon`, `save_look`, `compare_looks`,
+ * `await_reaction`.
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { useWebMCP } from '@mcp-b/react-webmcp';
 import type { Garment } from '../garments/schema';
 import type { SavedLook } from '../hooks/useLooks';
+import type { Reaction } from '../hooks/useReaction';
 import { searchCatalog } from './searchCatalog';
 
 /** Result of an attempted `save_look` — App decides whether the snapshot can be taken. */
@@ -40,6 +42,8 @@ interface StylistToolsDeps {
   onSaveLook: (label?: string) => SaveLookResult;
   /** Select saved looks for the side-by-side comparison view. */
   onCompareLooks: (lookIds: string[]) => void;
+  /** Block until the human taps a reaction chip (or timeout). See hooks/useReaction.ts. */
+  onAwaitReaction: (timeoutMs: number) => Promise<Reaction | null>;
 }
 
 const SEARCH_INPUT_SCHEMA = {
@@ -95,6 +99,23 @@ const COMPARE_LOOKS_INPUT_SCHEMA = {
   },
   required: ['lookIds'],
 } as const;
+
+const AWAIT_REACTION_INPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    timeoutSeconds: {
+      type: 'number',
+      description: 'How long to wait for the user before giving up (default 120, max 600).',
+    },
+  },
+} as const;
+
+const REACTION_GUIDANCE: Record<Reaction['kind'], string> = {
+  love: 'They love it. Call save_look, and you are essentially done unless they want options.',
+  like: 'Positive but not final. save_look, then you may offer one more option to compare.',
+  try_another: 'Apply a different garment — use the next search result, or re-search with their note.',
+  reject: 'Not this one. Switch to a clearly different colour/style, or run search_catalog again.',
+};
 
 function describeGarment(g: Garment) {
   return {
@@ -178,7 +199,9 @@ export function useStylistTools(deps: StylistToolsDeps) {
         ok: true,
         applied: describeGarment(garment),
         loadedDefaultPhoto,
-        note: 'The try-on is rendering in the app preview now. Ask the user for their reaction.',
+        note:
+          'The try-on is rendering in the app preview now. Ask the user how it looks, then call ' +
+          'await_reaction to get their verdict.',
       };
     },
   });
@@ -245,6 +268,33 @@ export function useStylistTools(deps: StylistToolsDeps) {
     },
   });
 
+  const awaitReaction = useWebMCP({
+    name: 'await_reaction',
+    description:
+      "Wait for the user's structured reaction to the current try-on. Call this right after " +
+      'apply_tryon (and after asking them how it looks). Blocks until the user taps a reaction in ' +
+      'the app — Love it / Good / Try another / Not this — with an optional note, or until it times ' +
+      'out. Returns { reaction, note, guidance }.',
+    inputSchema: AWAIT_REACTION_INPUT_SCHEMA,
+    annotations: { readOnlyHint: true },
+    execute: async ({ timeoutSeconds }) => {
+      const seconds = Math.min(600, Math.max(5, timeoutSeconds ?? 120));
+      const reaction = await depsRef.current.onAwaitReaction(seconds * 1000);
+      if (!reaction) {
+        return {
+          reaction: 'none',
+          note: null,
+          guidance: 'The user did not react in time. Prompt them again, or ask in chat.',
+        };
+      }
+      return {
+        reaction: reaction.kind,
+        note: reaction.note,
+        guidance: REACTION_GUIDANCE[reaction.kind],
+      };
+    },
+  });
+
   const describeWorn = useCallback(() => {
     const { selectedTop, selectedBottom } = depsRef.current;
     return [selectedTop, selectedBottom].filter((g): g is Garment => !!g).map(describeGarment);
@@ -257,6 +307,7 @@ export function useStylistTools(deps: StylistToolsDeps) {
     applyState: apply.state,
     saveLookState: saveLook.state,
     compareLooksState: compareLooks.state,
+    awaitReactionState: awaitReaction.state,
     /** Currently-worn garments, for a UI activity readout. */
     describeWorn,
   };
