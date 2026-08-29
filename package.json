@@ -17,7 +17,8 @@
     "test:all": "npm run build --workspaces --if-present && npm run test --workspaces --if-present && npm test",
     "typecheck": "tsc --noEmit",
     "fetch-models": "node tools/fetch-models.mjs",
-    "fetch-test-photos": "node tools/fetch-test-photos.mjs"
+    "fetch-test-photos": "node tools/fetch-test-photos.mjs",
+    "smoke:webmcp": "node tools/webmcp-smoke.mjs"
   },
   "dependencies": {
     "@mcp-b/global": "^5.0.1",
@@ -34,6 +35,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "@webgpu/types": "^0.1.71",
+    "playwright": "^1.62.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.4",
     "vitest": "^4.1.10"
