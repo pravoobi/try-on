@@ -1,0 +1,107 @@
+# WebMCP Challenge — Try-On Stylist Plan
+
+Repo: https://github.com/pravoobi/try-on
+Deadline: Sept 3, 1:00 PM PT (= Sept 4, 1:30 AM IST) — submissions close, no late entries.
+
+## The pitch
+
+An agent-assisted styling loop on top of the existing on-device virtual try-on
+app. The agent searches the catalog and applies try-ons; the human reacts and
+steers, because only the human can judge fit and vibe. No server — WebMCP
+tools are plain JS functions the page already has, exposed via
+`navigator.modelContext.registerTool()`.
+
+## Decisions locked in
+
+- **Photo-based, not webcam.** Deterministic state for save/compare, no
+  camera-permission friction for judges, no need to touch the live pipeline.
+  Webcam mode stays in the app as an existing toggle, just outside the WebMCP
+  tool flow — fine to show off in the demo video, not part of the judged loop.
+- **Dress-only catalog for the demo.** Pants/shirts/tshirts/shorts/lehengas
+  have real pipeline support but uneven anchor quality — out of scope this
+  week. Praveen is picking the dresses that already fit well and removing the
+  rest from the demo catalog.
+- **Extend the existing app, don't rebuild.** The on-device (segmentation +
+  pose + TPS warp, WebGPU) pipeline is the differentiator; a week isn't enough
+  to rebuild that from scratch.
+
+## Open question — SETTLED (Day 1)
+
+Broadened the judged catalog from 3 dresses to **8 curated items**: 3 dresses,
+3 kurtis, 2 lehengas (all already fit well; the ill-fitting pants/shirts/
+tshirts/shorts were pruned from `catalog.json`). Kurtis + lehengas make the
+"Sangeet"/"wedding" demo script land and give `search_catalog` real breadth
+without needing new photography. Praveen to eyeball each of the 8 on a test
+photo and flag any that warp badly.
+
+Each entry now carries `meta.name` / `meta.price` (₹) / `meta.occasion[]` /
+`meta.color` — the fields `search_catalog` filters on.
+
+## WebMCP tool surface
+
+Registered via `@mcp-b/global` (installs `document.modelContext`, the current
+WebMCP surface; the deprecated `navigator.modelContext` still works as a
+fallback and Chromium's native impl is used when the flag is on) +
+`@mcp-b/react-webmcp`'s `useWebMCP`. Each tool points at logic that already
+exists in `App.tsx` — no new business logic, just a callable entry point.
+
+- `search_catalog({ query?, occasion?, color?, category?, maxPrice? })` →
+  filters the curated catalog (`src/webmcp/searchCatalog.ts`), returns matches
+  with id/name/price/color/occasion, ranked by query relevance.
+- `apply_tryon({ garmentId })` → calls the existing garment-select handler
+  against the loaded demo photo; auto-loads the first test photo if none is
+  loaded; composites and updates the preview.
+- `save_look({ label? })` → snapshots the composited photo-mode canvas (down-
+  scaled PNG) + worn garment ids into the in-memory looks tray
+  (`src/hooks/useLooks.ts`); returns the new `look-N` id + the full id list.
+- `compare_looks({ lookIds })` → selects saved looks and opens the side-by-side
+  comparison modal (`src/components/LooksPanel.tsx`); reports any missing ids.
+
+The looks tray + comparison are also human-drivable: a "＋ save current look"
+button and a per-card "compare" toggle run the same loop the agent does.
+
+## Day-by-day
+
+- [x] **Day 1 (Fri, Aug 28)** — Catalog pruned to 8 curated items (3 dress,
+      3 kurti, 2 lehenga); ill-fitting categories dropped. `meta.name` /
+      `price` / `occasion` / `color` added to `schema.ts` (all optional —
+      user uploads omit them) + every catalog entry. `searchCatalog.ts` pure
+      fn + 8 unit tests.
+- [x] **Day 2 (Sat, Aug 29)** — `search_catalog` + `apply_tryon` registered
+      via `@mcp-b/global` (WebMCP polyfill; passes through to native
+      `document.modelContext` when present) + `@mcp-b/react-webmcp`'s
+      `useWebMCP`. Wired in `src/webmcp/useStylistTools.ts`, consumed by
+      `App.tsx`. `apply_tryon` auto-loads the first test photo when none is
+      picked so the agent flow works cold. Verified end-to-end in Chrome:
+      `getTools()` lists both, `executeTool` runs the search→apply loop, dress
+      composites on the model. Small "AI stylist tools live" status indicator
+      with per-tool call counts.
+- [x] **Day 3 (Sun, Aug 30)** — `save_look` + `compare_looks` registered.
+      `src/hooks/useLooks.ts` (in-memory tray, not persisted) +
+      `src/components/LooksPanel.tsx` (thumbnail strip under the canvas +
+      side-by-side comparison modal, reusing the `.modal-overlay` pattern) +
+      `snapshotCanvas.ts` (downscaled data-URL of the composited canvas, via a
+      forwarded ref on the photo-mode `DebugCanvas`). Also human-drivable
+      (save button + per-card compare toggle). Verified E2E in Chrome:
+      search→apply→save→apply→save→compare renders both looks side by side;
+      missing look ids reported, not errored.
+- [ ] **Day 4 (Mon, Aug 31)** — Polish the human-agent loop: visible
+      highlight/transition when the agent applies a try-on, and a way for
+      the agent to receive structured reaction ("like this one" / "try
+      another") rather than only free-text chat. This is explicitly part of
+      the judging criteria (quality of the human-agent experience).
+- [ ] **Day 5 (Tue, Sep 1)** — Buffer + bug fixing. Confirm it works in
+      ChatGPT's in-app browser as well as Chrome — both are how judges will
+      actually test it.
+- [ ] **Day 6 (Wed, Sep 2)** — Update repo README with the real architecture
+      (current README undersells the project — 36 garments and multi-piece
+      compositing exist, only 4 garments are documented). Record demo video.
+      Fill out submission.
+- [ ] **Day 7 (Thu, Sep 3)** — Submit well before 1 PM PT / 1:30 AM IST
+      (Sep 4) — don't cut it close across the timezone gap.
+
+## Judging criteria (for reference while building)
+
+Usefulness, originality, execution, thoughtful use of WebMCP, and quality of
+the human-agent experience. The last one is the easiest to under-invest in —
+budget real time for Day 4.

@@ -4,7 +4,9 @@ import { BitmapCanvas } from './components/BitmapCanvas';
 import { DebugCanvas, type GarmentOverlay } from './components/DebugCanvas';
 import { GarmentPicker } from './components/GarmentPicker';
 import { GarmentUpload } from './components/GarmentUpload';
+import { LooksPanel } from './components/LooksPanel';
 import { PerfStats } from './components/PerfStats';
+import { snapshotCanvas } from './components/snapshotCanvas';
 import { config } from './config';
 import {
   isTwoPieceLehenga,
@@ -16,6 +18,7 @@ import {
 } from './garments/schema';
 import { useAdvancedMode } from './hooks/useAdvancedMode';
 import { useGarmentCatalog } from './hooks/useGarmentCatalog';
+import { useLooks, type SavedLook } from './hooks/useLooks';
 import { useGestureSwipe } from './hooks/useGestureSwipe';
 import { useLiveDepth } from './hooks/useLiveDepth';
 import { useMatting } from './hooks/useMatting';
@@ -24,6 +27,7 @@ import { usePipeline } from './hooks/usePipeline';
 import { useTorsoOrientation } from './hooks/useTorsoOrientation';
 import { useUserGarments } from './hooks/useUserGarments';
 import { useWebcam } from './hooks/useWebcam';
+import { useStylistTools } from './webmcp/useStylistTools';
 import { mirrorAnchorsLR } from '@practics/tryon-core';
 import type { TryOnStatus } from '@practics/tryon-core';
 import type { SwipeDirection } from '@practics/tryon-core';
@@ -81,6 +85,7 @@ export default function App() {
   const pipeline = usePipeline(accelerator);
   const catalog = useGarmentCatalog();
   const userGarments = useUserGarments();
+  const looks = useLooks();
   const webcam = useWebcam();
   const live = useLiveTryOn(pipeline, webcam.videoEl, mode === 'live');
   const [image, setImage] = useState<ImageBitmap | null>(null);
@@ -97,6 +102,10 @@ export default function App() {
   const [bottomImage, setBottomImage] = useState<ImageBitmap | null>(null);
   const [garmentError, setGarmentError] = useState<string | null>(null);
   const [tryOnStatus, setTryOnStatus] = useState<TryOnStatus | null>(null);
+  /** Transient notice from a save-look attempt (e.g. "nothing rendered yet"). */
+  const [lookNotice, setLookNotice] = useState<string | null>(null);
+  /** The photo-mode composited canvas — snapshotted by `save_look`. */
+  const photoCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageRef = useRef<ImageBitmap | null>(null);
   const resultRef = useRef<PipelineResult | null>(null);
   const garmentImagesRef = useRef<LoadedGarmentImages | null>(null);
@@ -637,15 +646,72 @@ export default function App() {
     e.target.value = '';
   };
 
-  const onTestPhoto = async (name: string) => {
-    setRunError(null);
-    const res = await fetch(assetUrl(`/test-photos/${name}`));
-    if (!res.ok) {
-      setRunError(`could not load ${name} — missing from public/test-photos/ (try \`npm run fetch-test-photos -- --force\`)`);
-      return;
-    }
-    void loadBitmap(await res.blob());
-  };
+  const onTestPhoto = useCallback(
+    async (name: string) => {
+      setRunError(null);
+      const res = await fetch(assetUrl(`/test-photos/${name}`));
+      if (!res.ok) {
+        setRunError(`could not load ${name} — missing from public/test-photos/ (try \`npm run fetch-test-photos -- --force\`)`);
+        return;
+      }
+      await loadBitmap(await res.blob());
+    },
+    [loadBitmap],
+  );
+
+  // WebMCP "stylist" tools (see src/webmcp/, webmcp-challenge-plan.md): an
+  // agent searches the catalog and applies try-ons; the human judges fit.
+  // Photo-based by design — `apply_tryon` falls back to the first test photo
+  // when the user hasn't picked one, so the agent flow works cold.
+  const applyGarmentFromAgent = useCallback(
+    (g: Garment) => {
+      setMode('photo');
+      selectGarment(g, { toggle: false });
+    },
+    [selectGarment],
+  );
+  const loadDefaultPhoto = useCallback(
+    () => onTestPhoto(config.testPhotos[0]),
+    [onTestPhoto],
+  );
+
+  // Freeze the current try-on into the saved-looks tray (the `save_look`
+  // tool, and the panel's own "save current look" button). Reads the
+  // composited photo-mode canvas directly — it's full photo resolution, so
+  // snapshotCanvas downscales before stashing the data URL.
+  const captureLook = useCallback(
+    (label?: string): { ok: true; look: SavedLook } | { ok: false; error: string } => {
+      setLookNotice(null);
+      if (mode !== 'photo' || !image) return { ok: false, error: 'Load a photo first (save_look is photo-mode only).' };
+      if (!selectedTop && !selectedBottom) {
+        return { ok: false, error: 'No garment applied yet — apply one first.' };
+      }
+      const canvas = photoCanvasRef.current;
+      if (!canvas || canvas.width === 0) {
+        return { ok: false, error: 'The preview is still rendering — try again in a moment.' };
+      }
+      try {
+        const garmentIds = [selectedTop?.id, selectedBottom?.id].filter((id): id is string => !!id);
+        const look = looks.saveLook({ label, thumbnail: snapshotCanvas(canvas), garmentIds });
+        return { ok: true, look };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+    [mode, image, selectedTop, selectedBottom, looks],
+  );
+
+  const stylist = useStylistTools({
+    catalog: catalog.status === 'ready' ? catalog.garments : [],
+    selectedTop,
+    selectedBottom,
+    hasPhoto: !!image,
+    onApply: applyGarmentFromAgent,
+    onLoadDefaultPhoto: loadDefaultPhoto,
+    looks: looks.looks,
+    onSaveLook: captureLook,
+    onCompareLooks: looks.setComparison,
+  });
 
   // Live-mode front/back/fade decision (Phase A5) — a lehenga-choli never
   // has a back piece (schema.ts), so it always resolves hasBack=false and
@@ -765,6 +831,15 @@ export default function App() {
     [catalog.status, catalog.garments, userGarments.garments],
   );
 
+  /** Short display label for a garment id — used by the saved-looks panel. */
+  const garmentLabel = useCallback(
+    (id: string) => {
+      const g = allGarments.find((x) => x.id === id);
+      return g?.meta.name ?? id;
+    },
+    [allGarments],
+  );
+
   /**
    * What gesture swipes cycle through: top-slot garments only. Including
    * pants in the cycle made swipes LOOK dead across the catalog's pants
@@ -871,6 +946,29 @@ export default function App() {
             {pipeline.status === 'error' && <span className="error">init failed: {pipeline.error}</span>}
             {pipeline.status === 'ready' && `init ${Math.round(pipeline.initMs ?? 0)} ms`}
           </p>
+          {stylist.available && mode !== 'live' && (
+            <p
+              className="status webmcp-status"
+              title="This page exposes WebMCP tools an AI agent can call: search_catalog, apply_tryon, save_look, compare_looks"
+            >
+              <span className="webmcp-dot" aria-hidden /> AI stylist tools live
+              {' — '}
+              {(
+                [
+                  ['search', stylist.searchState.executionCount],
+                  ['try-on', stylist.applyState.executionCount],
+                  ['save', stylist.saveLookState.executionCount],
+                  ['compare', stylist.compareLooksState.executionCount],
+                ] as const
+              ).map(([label, count], i) => (
+                <span key={label}>
+                  {i > 0 && ' · '}
+                  {label}
+                  {count > 0 && ` ×${count}`}
+                </span>
+              ))}
+            </p>
+          )}
         </header>
 
         {pipeline.status === 'ready' && (
@@ -1034,6 +1132,7 @@ export default function App() {
             <main>
               {displayImage ? (
                 <DebugCanvas
+                  ref={photoCanvasRef}
                   image={displayImage}
                   result={displayResult}
                   showMask={showMask}
@@ -1052,6 +1151,25 @@ export default function App() {
                 </p>
               )}
             </main>
+          )}
+
+          {mode === 'photo' && !isFullscreen && (
+            <>
+              {lookNotice && <p className="hint">{lookNotice}</p>}
+              <LooksPanel
+                looks={looks.looks}
+                comparison={looks.comparison}
+                garmentLabel={garmentLabel}
+                canSave={!!image && (!!selectedTop || !!selectedBottom)}
+                onSaveCurrent={() => {
+                  const res = captureLook();
+                  if (!res.ok) setLookNotice(res.error);
+                }}
+                onToggleComparison={looks.toggleComparison}
+                onClearComparison={looks.clearComparison}
+                onRemove={looks.removeLook}
+              />
+            </>
           )}
         </div>
 

@@ -4,34 +4,20 @@
     "category": "dress",
     "image": "/garments/dress-navy-floral-01.png",
     "anchors": {
-      "shoulderL": [
-        177,
-        56
-      ],
-      "shoulderR": [
-        451,
-        56
-      ],
-      "waistL": [
-        206,
-        319
-      ],
-      "waistR": [
-        389,
-        319
-      ],
-      "hemL": [
-        124.7,
-        1141
-      ],
-      "hemR": [
-        508.9,
-        1141
-      ]
+      "shoulderL": [177, 56],
+      "shoulderR": [451, 56],
+      "waistL": [206, 319],
+      "waistR": [389, 319],
+      "hemL": [124.7, 1141],
+      "hemR": [508.9, 1141]
     },
     "meta": {
       "sleeves": "half",
-      "length": "ankle"
+      "length": "ankle",
+      "name": "Navy Floral Maxi Dress",
+      "price": 4200,
+      "color": "navy",
+      "occasion": ["party", "reception", "brunch", "date-night"]
     }
   },
   {
@@ -39,69 +25,20 @@
     "category": "dress",
     "image": "/garments/dress-green-floral-01.png",
     "anchors": {
-      "shoulderL": [
-        81,
-        40
-      ],
-      "shoulderR": [
-        339,
-        40
-      ],
-      "waistL": [
-        120,
-        283
-      ],
-      "waistR": [
-        298,
-        283
-      ],
-      "hemL": [
-        76.7,
-        704
-      ],
-      "hemR": [
-        344.2,
-        704
-      ]
+      "shoulderL": [81, 40],
+      "shoulderR": [339, 40],
+      "waistL": [120, 283],
+      "waistR": [298, 283],
+      "hemL": [76.7, 704],
+      "hemR": [344.2, 704]
     },
     "meta": {
       "sleeves": "half",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "kurti-cream-embroidered-01",
-    "category": "kurti",
-    "image": "/garments/kurti-cream-embroidered-01.png",
-    "anchors": {
-      "shoulderL": [
-        173,
-        90
-      ],
-      "shoulderR": [
-        616,
-        90
-      ],
-      "waistL": [
-        194,
-        692
-      ],
-      "waistR": [
-        596,
-        692
-      ],
-      "hemL": [
-        172.6,
-        1090
-      ],
-      "hemR": [
-        613.1,
-        1090
-      ]
-    },
-    "meta": {
-      "sleeves": "full",
-      "length": "knee"
+      "length": "knee",
+      "name": "Emerald Floral Midi Dress",
+      "price": 3200,
+      "color": "green",
+      "occasion": ["party", "brunch", "daytime", "date-night"]
     }
   },
   {
@@ -109,808 +46,41 @@
     "category": "dress",
     "image": "/garments/dress-magenta-wrap-01.png",
     "anchors": {
-      "shoulderL": [
-        109,
-        90
-      ],
-      "shoulderR": [
-        444,
-        90
-      ],
-      "waistL": [
-        170,
-        334
-      ],
-      "waistR": [
-        384,
-        334
-      ],
-      "hemL": [
-        115.4,
-        1094
-      ],
-      "hemR": [
-        449.4,
-        1094
-      ]
+      "shoulderL": [109, 90],
+      "shoulderR": [444, 90],
+      "waistL": [170, 334],
+      "waistR": [384, 334],
+      "hemL": [115.4, 1094],
+      "hemR": [449.4, 1094]
     },
     "meta": {
       "sleeves": "half",
-      "length": "ankle"
+      "length": "ankle",
+      "name": "Magenta Wrap Maxi Dress",
+      "price": 4800,
+      "color": "magenta",
+      "occasion": ["sangeet", "reception", "party", "cocktail"]
     }
   },
   {
-    "id": "pants-black-formal",
-    "category": "pants",
-    "image": "/garments/pants-black-formal.png",
-    "anchors": {
-      "waistL": [
-        18,
-        288
-      ],
-      "waistR": [
-        383,
-        288
-      ],
-      "hemL": [
-        26.7,
-        1122
-      ],
-      "hemR": [
-        374.5,
-        1122
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "pants-black-pleated-wide",
-    "category": "pants",
-    "image": "/garments/pants-black-pleated-wide.png",
-    "anchors": {
-      "waistL": [
-        61,
-        481
-      ],
-      "waistR": [
-        454,
-        481
-      ],
-      "hemL": [
-        35.3,
-        1147
-      ],
-      "hemR": [
-        480,
-        1147
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "pants-brown-regular",
-    "category": "pants",
-    "image": "/garments/pants-brown-regular.png",
-    "anchors": {
-      "waistL": [
-        36,
-        453
-      ],
-      "waistR": [
-        411,
-        453
-      ],
-      "hemL": [
-        25.7,
-        1085
-      ],
-      "hemR": [
-        422.2,
-        1085
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "pants-navy-straight",
-    "category": "pants",
-    "image": "/garments/pants-navy-straight.png",
-    "anchors": {
-      "waistL": [
-        28,
-        258
-      ],
-      "waistR": [
-        354,
-        258
-      ],
-      "hemL": [
-        23,
-        960
-      ],
-      "hemR": [
-        358.5,
-        960
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "pants-blue-regular",
-    "category": "pants",
-    "image": "/garments/pants-blue-regular.png",
-    "anchors": {
-      "waistL": [
-        34,
-        383
-      ],
-      "waistR": [
-        380,
-        383
-      ],
-      "hemL": [
-        30.2,
-        966
-      ],
-      "hemR": [
-        383.3,
-        966
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "pants-cream-straight",
-    "category": "pants",
-    "image": "/garments/pants-cream-straight.png",
-    "anchors": {
-      "waistL": [
-        13,
-        215
-      ],
-      "waistR": [
-        341,
-        215
-      ],
-      "hemL": [
-        60.3,
-        991
-      ],
-      "hemR": [
-        304.8,
-        991
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "pants-olive-01",
-    "category": "pants",
-    "image": "/garments/pants-olive-01.png",
-    "anchors": {
-      "waistL": [
-        48,
-        374
-      ],
-      "waistR": [
-        373,
-        374
-      ],
-      "hemL": [
-        31.5,
-        963
-      ],
-      "hemR": [
-        389.6,
-        963
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "pants-red-01",
-    "category": "pants",
-    "image": "/garments/pants-red-01.png",
-    "anchors": {
-      "waistL": [
-        14,
-        275
-      ],
-      "waistR": [
-        368,
-        275
-      ],
-      "hemL": [
-        47.6,
-        897
-      ],
-      "hemR": [
-        338.9,
-        897
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "shorts-corduroy",
-    "category": "pants",
-    "image": "/garments/shorts-corduroy.png",
-    "anchors": {
-      "waistL": [
-        102,
-        334
-      ],
-      "waistR": [
-        770,
-        334
-      ],
-      "hemL": [
-        143,
-        794
-      ],
-      "hemR": [
-        729.5,
-        794
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "shorts-black-high-rise",
-    "category": "pants",
-    "image": "/garments/shorts-black-high-rise.png",
-    "anchors": {
-      "waistL": [
-        84,
-        355
-      ],
-      "waistR": [
-        798,
-        355
-      ],
-      "hemL": [
-        357.2,
-        843
-      ],
-      "hemR": [
-        633.1,
-        843
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "shorts-relaxed-denim",
-    "category": "pants",
-    "image": "/garments/shorts-relaxed-denim.png",
-    "anchors": {
-      "waistL": [
-        58,
-        218
-      ],
-      "waistR": [
-        509,
-        218
-      ],
-      "hemL": [
-        83.9,
-        519
-      ],
-      "hemR": [
-        484.5,
-        519
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "shorts-relaxed-fit-denim",
-    "category": "pants",
-    "image": "/garments/shorts-relaxed-fit-denim.png",
-    "anchors": {
-      "waistL": [
-        74,
-        288
-      ],
-      "waistR": [
-        621,
-        288
-      ],
-      "hemL": [
-        121.7,
-        680
-      ],
-      "hemR": [
-        554,
-        680
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "shorts-green-skinny",
-    "category": "pants",
-    "image": "/garments/shorts-green-skinny.png",
-    "anchors": {
-      "waistL": [
-        27,
-        356
-      ],
-      "waistR": [
-        615,
-        356
-      ],
-      "hemL": [
-        74,
-        858
-      ],
-      "hemR": [
-        567.9,
-        858
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "shorts-white-denim",
-    "category": "pants",
-    "image": "/garments/shorts-white-denim.png",
-    "anchors": {
-      "waistL": [
-        64,
-        299
-      ],
-      "waistR": [
-        700,
-        299
-      ],
-      "hemL": [
-        164.1,
-        711
-      ],
-      "hemR": [
-        662.7,
-        711
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "shirt-denim-casual",
-    "category": "shirt",
-    "image": "/garments/shirt-denim-casual.png",
-    "anchors": {
-      "shoulderL": [
-        220,
-        100
-      ],
-      "shoulderR": [
-        580,
-        100
-      ],
-      "waistL": [
-        137.8,
-        433
-      ],
-      "waistR": [
-        662.6,
-        433
-      ],
-      "hemL": [
-        70.6,
-        705
-      ],
-      "hemR": [
-        730.1,
-        705
-      ]
-    },
-    "meta": {
-      "sleeves": "full",
-      "length": "hip"
-    }
-  },
-  {
-    "id": "shirt-pink-formal",
-    "category": "shirt",
-    "image": "/garments/shirt-pink-formal.png",
-    "anchors": {
-      "shoulderL": [
-        130,
-        99
-      ],
-      "shoulderR": [
-        505,
-        99
-      ],
-      "waistL": [
-        151,
-        683
-      ],
-      "waistR": [
-        484,
-        683
-      ],
-      "hemL": [
-        193.9,
-        726
-      ],
-      "hemR": [
-        438.7,
-        726
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "hip"
-    },
-    "back": {
-      "image": "/garments/shirt-pink-formal-back.png",
-      "anchors": {
-        "shoulderL": [
-          172,
-          141
-        ],
-        "shoulderR": [
-          686,
-          141
-        ],
-        "waistL": [
-          200,
-          981
-        ],
-        "waistR": [
-          659,
-          981
-        ],
-        "hemL": [
-          252.8,
-          1042
-        ],
-        "hemR": [
-          605.9,
-          1042
-        ]
-      }
-    }
-  },
-  {
-    "id": "shirt-white-01",
-    "category": "shirt",
-    "image": "/garments/shirt-white-01.png",
-    "anchors": {
-      "shoulderL": [
-        137,
-        121
-      ],
-      "shoulderR": [
-        532,
-        121
-      ],
-      "waistL": [
-        88.3,
-        497
-      ],
-      "waistR": [
-        579.7,
-        497
-      ],
-      "hemL": [
-        48.6,
-        804
-      ],
-      "hemR": [
-        618.6,
-        804
-      ]
-    },
-    "meta": {
-      "sleeves": "full",
-      "length": "hip"
-    },
-    "back": {
-      "image": "/garments/shirt-white-01-back.png",
-      "anchors": {
-        "shoulderL": [
-          136,
-          151
-        ],
-        "shoulderR": [
-          600,
-          151
-        ],
-        "waistL": [
-          151.3,
-          598
-        ],
-        "waistR": [
-          584.6,
-          598
-        ],
-        "hemL": [
-          163.8,
-          964
-        ],
-        "hemR": [
-          572.1,
-          964
-        ]
-      }
-    }
-  },
-  {
-    "id": "tshirt-green-printed",
-    "category": "tshirt",
-    "image": "/garments/tshirt-green-printed.png",
-    "anchors": {
-      "shoulderL": [
-        165,
-        105
-      ],
-      "shoulderR": [
-        729,
-        105
-      ],
-      "waistL": [
-        225,
-        556
-      ],
-      "waistR": [
-        668,
-        556
-      ],
-      "hemL": [
-        201.7,
-        995
-      ],
-      "hemR": [
-        691.8,
-        995
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "hip"
-    }
-  },
-  {
-    "id": "tshirt-polo-collared",
-    "category": "tshirt",
-    "image": "/garments/tshirt-polo-collared.png",
-    "anchors": {
-      "shoulderL": [
-        138,
-        138
-      ],
-      "shoulderR": [
-        631,
-        138
-      ],
-      "waistL": [
-        183,
-        571
-      ],
-      "waistR": [
-        586,
-        571
-      ],
-      "hemL": [
-        164,
-        996
-      ],
-      "hemR": [
-        605.1,
-        996
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "hip"
-    },
-    "back": {
-      "image": "/garments/tshirt-polo-collared-back.png",
-      "anchors": {
-        "shoulderL": [
-          145,
-          136
-        ],
-        "shoulderR": [
-          607,
-          136
-        ],
-        "waistL": [
-          176,
-          529
-        ],
-        "waistR": [
-          576,
-          529
-        ],
-        "hemL": [
-          179,
-          904
-        ],
-        "hemR": [
-          572.9,
-          904
-        ]
-      }
-    }
-  },
-  {
-    "id": "tshirt-yellow-vneck",
-    "category": "tshirt",
-    "image": "/garments/tshirt-yellow-vneck.png",
-    "anchors": {
-      "shoulderL": [
-        151,
-        83
-      ],
-      "shoulderR": [
-        601,
-        83
-      ],
-      "waistL": [
-        174,
-        491
-      ],
-      "waistR": [
-        577,
-        491
-      ],
-      "hemL": [
-        170.2,
-        824
-      ],
-      "hemR": [
-        581.2,
-        824
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "hip"
-    },
-    "back": {
-      "image": "/garments/tshirt-yellow-vneck-back.png",
-      "anchors": {
-        "shoulderL": [
-          129,
-          84
-        ],
-        "shoulderR": [
-          556,
-          84
-        ],
-        "waistL": [
-          175,
-          458
-        ],
-        "waistR": [
-          510,
-          458
-        ],
-        "hemL": [
-          161.9,
-          795
-        ],
-        "hemR": [
-          522.9,
-          795
-        ]
-      }
-    }
-  },
-  {
-    "id": "kurti-flare-sleeve",
+    "id": "kurti-cream-embroidered-01",
     "category": "kurti",
-    "image": "/garments/kurti-flare-sleeve.png",
+    "image": "/garments/kurti-cream-embroidered-01.png",
     "anchors": {
-      "shoulderL": [
-        306,
-        69
-      ],
-      "shoulderR": [
-        654,
-        69
-      ],
-      "waistL": [
-        313.2,
-        418
-      ],
-      "waistR": [
-        643.6,
-        418
-      ],
-      "hemL": [
-        319,
-        703
-      ],
-      "hemR": [
-        635,
-        703
-      ]
+      "shoulderL": [173, 90],
+      "shoulderR": [616, 90],
+      "waistL": [194, 692],
+      "waistR": [596, 692],
+      "hemL": [172.6, 1090],
+      "hemR": [613.1, 1090]
     },
     "meta": {
       "sleeves": "full",
-      "length": "hip"
-    }
-  },
-  {
-    "id": "kurti-floral-printed-02",
-    "category": "kurti",
-    "image": "/garments/kurti-floral-printed-02.png",
-    "anchors": {
-      "shoulderL": [
-        101,
-        37
-      ],
-      "shoulderR": [
-        448,
-        37
-      ],
-      "waistL": [
-        87.8,
-        539
-      ],
-      "waistR": [
-        462.6,
-        539
-      ],
-      "hemL": [
-        77,
-        950
-      ],
-      "hemR": [
-        474.5,
-        950
-      ]
-    },
-    "meta": {
-      "sleeves": "sleeveless",
-      "length": "knee"
+      "length": "knee",
+      "name": "Cream Embroidered Kurti",
+      "price": 2600,
+      "color": "cream",
+      "occasion": ["festive", "mehendi", "daytime", "office"]
     }
   },
   {
@@ -918,273 +88,41 @@
     "category": "kurti",
     "image": "/garments/kurti-floral-printed-01.png",
     "anchors": {
-      "shoulderL": [
-        129,
-        48
-      ],
-      "shoulderR": [
-        478,
-        48
-      ],
-      "waistL": [
-        100.8,
-        643
-      ],
-      "waistR": [
-        514.6,
-        643
-      ],
-      "hemL": [
-        77.7,
-        1129
-      ],
-      "hemR": [
-        544.5,
-        1129
-      ]
+      "shoulderL": [129, 48],
+      "shoulderR": [478, 48],
+      "waistL": [100.8, 643],
+      "waistR": [514.6, 643],
+      "hemL": [77.7, 1129],
+      "hemR": [544.5, 1129]
     },
     "meta": {
       "sleeves": "sleeveless",
-      "length": "knee"
+      "length": "knee",
+      "name": "Indigo Floral A-line Kurti",
+      "price": 1800,
+      "color": "indigo",
+      "occasion": ["casual", "daytime", "office", "brunch"]
     }
   },
   {
-    "id": "kurti-motifs-printed",
+    "id": "kurti-floral-printed-02",
     "category": "kurti",
-    "image": "/garments/kurti-motifs-printed.png",
+    "image": "/garments/kurti-floral-printed-02.png",
     "anchors": {
-      "shoulderL": [
-        142,
-        38
-      ],
-      "shoulderR": [
-        457,
-        38
-      ],
-      "waistL": [
-        90,
-        571
-      ],
-      "waistR": [
-        507.7,
-        571
-      ],
-      "hemL": [
-        47.5,
-        1007
-      ],
-      "hemR": [
-        549.2,
-        1007
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "knee"
-    }
-  },
-  {
-    "id": "kurti-white-short",
-    "category": "kurti",
-    "image": "/garments/kurti-white-short.png",
-    "anchors": {
-      "shoulderL": [
-        157,
-        91
-      ],
-      "shoulderR": [
-        582,
-        91
-      ],
-      "waistL": [
-        174.9,
-        545
-      ],
-      "waistR": [
-        562.8,
-        545
-      ],
-      "hemL": [
-        189.6,
-        917
-      ],
-      "hemR": [
-        547,
-        917
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "knee"
-    },
-    "back": {
-      "image": "/garments/kurti-white-short-back.png",
-      "anchors": {
-        "shoulderL": [
-          145,
-          113
-        ],
-        "shoulderR": [
-          586,
-          113
-        ],
-        "waistL": [
-          144,
-          585
-        ],
-        "waistR": [
-          586.1,
-          585
-        ],
-        "hemL": [
-          143.1,
-          972
-        ],
-        "hemR": [
-          586.1,
-          972
-        ]
-      }
-    }
-  },
-  {
-    "id": "lehenga-embroidered",
-    "category": "lehenga-choli",
-    "image": "/garments/lehenga-embroidered.png",
-    "anchors": {
-      "shoulderL": [
-        276,
-        58
-      ],
-      "shoulderR": [
-        576,
-        58
-      ],
-      "waistL": [
-        256,
-        451
-      ],
-      "waistR": [
-        588,
-        451
-      ],
-      "hemL": [
-        30,
-        1041
-      ],
-      "hemR": [
-        773,
-        1041
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "lehenga-kushal-printed",
-    "category": "lehenga-choli",
-    "image": "/garments/lehenga-kushal-printed.png",
-    "anchors": {
-      "shoulderL": [
-        312,
-        61
-      ],
-      "shoulderR": [
-        583,
-        61
-      ],
-      "waistL": [
-        477.7,
-        356
-      ],
-      "waistR": [
-        667.4,
-        356
-      ],
-      "hemL": [
-        33,
-        990
-      ],
-      "hemR": [
-        857,
-        990
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "lehenga-sharara",
-    "category": "lehenga-choli",
-    "image": "/garments/lehenga-sharara.png",
-    "anchors": {
-      "shoulderL": [
-        176,
-        43
-      ],
-      "shoulderR": [
-        355,
-        43
-      ],
-      "waistL": [
-        202.9,
-        290
-      ],
-      "waistR": [
-        328.2,
-        290
-      ],
-      "hemL": [
-        20,
-        931
-      ],
-      "hemR": [
-        514,
-        931
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "lehenga-yellow",
-    "category": "lehenga-choli",
-    "image": "/garments/lehenga-yellow.png",
-    "anchors": {
-      "shoulderL": [
-        279,
-        213
-      ],
-      "shoulderR": [
-        590,
-        213
-      ],
-      "waistL": [
-        125,
-        584
-      ],
-      "waistR": [
-        633,
-        584
-      ],
-      "hemL": [
-        28,
-        762
-      ],
-      "hemR": [
-        723,
-        762
-      ]
+      "shoulderL": [101, 37],
+      "shoulderR": [448, 37],
+      "waistL": [87.8, 539],
+      "waistR": [462.6, 539],
+      "hemL": [77, 950],
+      "hemR": [474.5, 950]
     },
     "meta": {
       "sleeves": "sleeveless",
-      "length": "ankle"
+      "length": "knee",
+      "name": "Pink Floral Sleeveless Kurti",
+      "price": 1900,
+      "color": "pink",
+      "occasion": ["casual", "daytime", "brunch"]
     }
   },
   {
@@ -1192,34 +130,20 @@
     "category": "lehenga-choli",
     "image": "/garments/lehenga-pink.png",
     "anchors": {
-      "shoulderL": [
-        227,
-        48
-      ],
-      "shoulderR": [
-        434,
-        48
-      ],
-      "waistL": [
-        252,
-        234
-      ],
-      "waistR": [
-        411,
-        234
-      ],
-      "hemL": [
-        24,
-        866
-      ],
-      "hemR": [
-        626,
-        866
-      ]
+      "shoulderL": [227, 48],
+      "shoulderR": [434, 48],
+      "waistL": [252, 234],
+      "waistR": [411, 234],
+      "hemL": [24, 866],
+      "hemR": [626, 866]
     },
     "meta": {
       "sleeves": "half",
-      "length": "ankle"
+      "length": "ankle",
+      "name": "Blush Pink Lehenga Choli",
+      "price": 12500,
+      "color": "pink",
+      "occasion": ["wedding", "sangeet", "reception"]
     }
   },
   {
@@ -1227,69 +151,20 @@
     "category": "lehenga-choli",
     "image": "/garments/lehenga-sangria.png",
     "anchors": {
-      "shoulderL": [
-        211,
-        46
-      ],
-      "shoulderR": [
-        470,
-        46
-      ],
-      "waistL": [
-        247,
-        243
-      ],
-      "waistR": [
-        432,
-        243
-      ],
-      "hemL": [
-        25,
-        938
-      ],
-      "hemR": [
-        645,
-        938
-      ]
+      "shoulderL": [211, 46],
+      "shoulderR": [470, 46],
+      "waistL": [247, 243],
+      "waistR": [432, 243],
+      "hemL": [25, 938],
+      "hemR": [645, 938]
     },
     "meta": {
       "sleeves": "half",
-      "length": "ankle"
-    }
-  },
-  {
-    "id": "lehenga-sequined",
-    "category": "lehenga-choli",
-    "image": "/garments/lehenga-sequined.png",
-    "anchors": {
-      "shoulderL": [
-        210,
-        47
-      ],
-      "shoulderR": [
-        461,
-        47
-      ],
-      "waistL": [
-        141.7,
-        240
-      ],
-      "waistR": [
-        317.4,
-        240
-      ],
-      "hemL": [
-        25,
-        909
-      ],
-      "hemR": [
-        640,
-        909
-      ]
-    },
-    "meta": {
-      "sleeves": "half",
-      "length": "ankle"
+      "length": "ankle",
+      "name": "Sangria Red Lehenga Choli",
+      "price": 13500,
+      "color": "red",
+      "occasion": ["wedding", "sangeet", "reception"]
     }
   }
 ]

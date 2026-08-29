@@ -435,6 +435,156 @@ h1 {
   color: #fbbf24;
 }
 
+.webmcp-status {
+  margin-top: -0.6rem;
+  color: #7dd3fc;
+  font-size: 0.8rem;
+}
+
+.webmcp-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 0.4rem;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6);
+  animation: webmcp-pulse 2s ease-out infinite;
+}
+
+/* Saved-looks tray + comparison (see components/LooksPanel.tsx, WebMCP
+   save_look / compare_looks). */
+.looks-panel {
+  margin-top: 0.75rem;
+}
+
+.looks-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.looks-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.look-card {
+  width: 116px;
+  border: 1px solid #2b3140;
+  border-radius: 8px;
+  padding: 0.35rem;
+  background: #14171e;
+}
+
+.look-card.comparing {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
+}
+
+.look-card img {
+  display: block;
+  width: 100%;
+  border-radius: 5px;
+  background: #000;
+}
+
+.look-card-label {
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.look-card-garments {
+  color: #9ca3af;
+  font-size: 0.7rem;
+  line-height: 1.25;
+  margin-top: 0.1rem;
+}
+
+.look-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+}
+
+.look-card-compare {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.45rem;
+}
+
+.look-card-compare[aria-pressed='true'] {
+  background: #0c4a6e;
+  border-color: #38bdf8;
+  color: #e0f2fe;
+}
+
+.look-card-remove {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.4rem;
+  color: #9ca3af;
+}
+
+.modal-content.looks-compare {
+  max-width: 900px;
+}
+
+.looks-compare-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
+}
+
+.looks-compare-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1rem;
+  justify-content: center;
+  overflow-x: auto;
+}
+
+.looks-compare-item {
+  margin: 0;
+  flex: 0 0 auto;
+  max-width: 44vw;
+}
+
+.looks-compare-item img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 62vh;
+  border-radius: 8px;
+  background: #000;
+}
+
+.looks-compare-item figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.4rem;
+}
+
+.looks-compare-item-label {
+  font-weight: 600;
+}
+
+@keyframes webmcp-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(56, 189, 248, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+  }
+}
+
 .error {
   color: #f87171;
 }

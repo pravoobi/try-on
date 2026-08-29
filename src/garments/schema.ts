@@ -45,6 +45,20 @@ export interface GarmentMeta {
    * garment also carries sleeve anchors.
    */
   sleeveFlare?: SleeveFlare;
+  /**
+   * Merchandising metadata — present on shipped catalog entries, absent on
+   * user-uploaded garments (the upload flow has no price/occasion input).
+   * Powers the WebMCP `search_catalog` tool (see src/webmcp/): the agent
+   * filters on price and occasion, so these are the fields it reasons over.
+   */
+  /** Human-readable display name, e.g. "Magenta Wrap Maxi Dress". */
+  name?: string;
+  /** Retail price in INR (₹). `search_catalog`'s `maxPrice` compares against this. */
+  price?: number;
+  /** Lowercase occasion tags this garment suits, e.g. ["sangeet", "reception"]. */
+  occasion?: string[];
+  /** Primary colour, lowercase single word, e.g. "navy", "magenta". */
+  color?: string;
 }
 
 /** A single-image garment piece using the full 6-anchor set (shoulder/waist/hem). */
@@ -202,10 +216,31 @@ function validateMeta(v: unknown, path: string): GarmentMeta {
   if (obj.sleeveFlare !== undefined && !SLEEVE_FLARES.includes(obj.sleeveFlare as SleeveFlare)) {
     fail(path, `meta.sleeveFlare must be one of ${SLEEVE_FLARES.join(', ')}`);
   }
+  // Merchandising fields — all optional (user uploads omit them), but a
+  // present value that's the wrong type should fail loudly like any anchor.
+  if (obj.name !== undefined && (typeof obj.name !== 'string' || obj.name.length === 0)) {
+    fail(path, 'meta.name must be a non-empty string');
+  }
+  if (obj.price !== undefined && (typeof obj.price !== 'number' || !Number.isFinite(obj.price) || obj.price < 0)) {
+    fail(path, 'meta.price must be a non-negative finite number');
+  }
+  if (
+    obj.occasion !== undefined &&
+    (!Array.isArray(obj.occasion) || obj.occasion.some((o) => typeof o !== 'string'))
+  ) {
+    fail(path, 'meta.occasion must be an array of strings');
+  }
+  if (obj.color !== undefined && (typeof obj.color !== 'string' || obj.color.length === 0)) {
+    fail(path, 'meta.color must be a non-empty string');
+  }
   return {
     sleeves: obj.sleeves as SleeveLength,
     length: obj.length as HemLength,
     ...(obj.sleeveFlare !== undefined ? { sleeveFlare: obj.sleeveFlare as SleeveFlare } : {}),
+    ...(obj.name !== undefined ? { name: obj.name as string } : {}),
+    ...(obj.price !== undefined ? { price: obj.price as number } : {}),
+    ...(obj.occasion !== undefined ? { occasion: (obj.occasion as string[]).map((o) => o.toLowerCase()) } : {}),
+    ...(obj.color !== undefined ? { color: (obj.color as string).toLowerCase() } : {}),
   };
 }
 
