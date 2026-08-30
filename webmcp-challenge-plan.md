@@ -64,6 +64,20 @@ The looks tray + comparison + reaction chips are also human-drivable: a
 "＋ save current look" button, a per-card "compare" toggle, and the reaction
 bar run the same loop the agent does.
 
+## Testing the tools
+
+- `npm run smoke:webmcp` — `tools/webmcp-smoke.mjs` drives a headless browser
+  through the full `getTools()` → `executeTool()` loop and asserts all five
+  tools' responses (17 checks). Needs the app served (`npm run dev`) and
+  `npx playwright install chromium` once. `--headed` / `--url <deployed>` flags.
+- Browser console on the running app: `document.modelContext.getTools()` /
+  `executeTool(tool, JSON.stringify(args))` — the tool's own return is under
+  the envelope's `.structuredContent`.
+- Real agent: the **WebMCP Bridge** Chrome extension bridges the page's tools
+  to a local MCP client (Claude Code / Claude Desktop / Cursor); the **WebMCP
+  Inspector** extension gives a no-client panel. Native path: Chrome 146+
+  with the WebMCP flag — `@mcp-b/global` defers to it.
+
 ## Day-by-day
 
 - [x] **Day 1 (Fri, Aug 28)** — Catalog pruned to 8 curated items (3 dress,
