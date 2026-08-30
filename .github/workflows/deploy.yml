@@ -23,7 +23,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 24, not 20: the lockfile is written by npm 11 (Node 22+), and
+          # npm 10 (Node 20) rejects it at `npm ci` with "Lock compromised".
+          # Node 20 is also deprecated on the runners now.
+          node-version: 24
           cache: npm
 
       - run: npm ci
