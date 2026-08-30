@@ -23,13 +23,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # 24, not 20: the lockfile is written by npm 11 (Node 22+), and
-          # npm 10 (Node 20) rejects it at `npm ci` with "Lock compromised".
-          # Node 20 is also deprecated on the runners now.
+          # Match the local npm (11.x) that writes the lockfile; Node 20 is
+          # also deprecated on the runners now.
           node-version: 24
           cache: npm
 
-      - run: npm ci
+      # `npm install`, not `npm ci`: the lockfile keeps drifting on the
+      # @rolldown/binding-wasm32-wasi → @napi-rs/wasm-runtime → @emnapi/*
+      # chain because those resolve to different patch versions on the
+      # Linux runner than on the dev box, and `npm ci` hard-fails on that
+      # ("Missing: @emnapi/core@x from lock file"). This is a static-site
+      # deploy — install reconciling the lock is an acceptable trade for it
+      # not breaking every time a transitive wasm shim publishes a patch.
+      - run: npm install --no-audit --no-fund
 
       # packages/*/dist is gitignored (build output, not source) — the app's
       # own tsc resolves @practics/tryon-core et al. via their package.json
