@@ -116,9 +116,17 @@ bar run the same loop the agent does.
       `apply_tryon`'s response now tells the agent to call `await_reaction`.
       Verified E2E in Chrome: blocking + resolve, note passthrough,
       fresh-reaction-returns-immediately, and timeout→`none`.
-- [ ] **Day 5 (Tue, Sep 1)** — Buffer + bug fixing. Confirm it works in
-      ChatGPT's in-app browser as well as Chrome — both are how judges will
-      actually test it.
+- [x] **Day 5 (Tue, Sep 1 — done early, Aug 31)** — Verified end-to-end in
+      ChatGPT's in-app browser (Codex): prompt `use sitetools: style me for a
+      sangeet under 8k` drove search_catalog → apply_tryon → save_look →
+      compare_looks, agent respected the ₹8k filter and deferred to the human's
+      final pick. Gap found: `await_reaction` never fired because the human
+      types the reaction and ChatGPT reads it from chat. Fix (commit 28fca9a):
+      `await_reaction` is now dual-mode — pass `reaction` (love/like/
+      try_another/reject) + `note` to log a chat reaction to the app's
+      reaction bar and get guidance immediately, or omit it to block for a chip
+      tap. Response carries `source` (chat/chip/timeout). Smoke test → 19
+      checks. Deployed + live.
 - [ ] **Day 6 (Wed, Sep 2)** — Update repo README with the real architecture
       (current README undersells the project — 36 garments and multi-piece
       compositing exist, only 4 garments are documented). Record demo video.
