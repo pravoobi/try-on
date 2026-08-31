@@ -229,16 +229,26 @@ try {
     j(reaction),
   );
 
-  // 13. await_reaction — timeout path
+  // 13. await_reaction — chat channel: agent passes the reaction it heard
+  const chatReaction = await callTool('await_reaction', { reaction: 'love', note: 'so good' });
+  check(
+    'await_reaction {reaction} → logs it, returns immediately with source "chat"',
+    chatReaction.reaction === 'love' && chatReaction.source === 'chat' && !!chatReaction.guidance,
+    j(chatReaction),
+  );
+  const lastLine = await page.textContent('.reaction-last').catch(() => '');
+  check('chat reaction shows on the app reaction bar', /Love it/.test(lastLine), j(lastLine));
+
+  // 14. await_reaction — timeout path (chip channel, nobody taps)
   const t0 = Date.now();
   const timedOut = await callTool('await_reaction', { timeoutSeconds: 5 });
   check(
-    'await_reaction times out → reaction: "none"',
+    'await_reaction (no reaction arg) times out → reaction: "none"',
     timedOut.reaction === 'none' && Date.now() - t0 >= 4500,
     `${j(timedOut)} after ${Date.now() - t0}ms`,
   );
 
-  // 14. no page errors along the way
+  // 15. no page errors along the way
   check('no console errors / page errors', consoleErrors.length === 0, consoleErrors.join(' | '));
 } catch (err) {
   failed++;

@@ -31,7 +31,13 @@ export interface UseReaction {
   pending: boolean;
   /** Human taps a reaction chip. */
   submit: (kind: ReactionKind, note?: string) => void;
-  /** Agent side: the next reaction (or a fresh unconsumed one), `null` on timeout. */
+  /**
+   * Agent side, chat channel: the user already said how they feel, so log it
+   * to the app (updates `last`, resolves any waiter) and mark it consumed —
+   * the caller already has it, so a follow-up `awaitNext` shouldn't re-serve it.
+   */
+  record: (kind: ReactionKind, note?: string) => void;
+  /** Agent side, chip channel: the next reaction (or a fresh unconsumed one), `null` on timeout. */
   awaitNext: (timeoutMs: number) => Promise<Reaction | null>;
 }
 
@@ -43,7 +49,7 @@ export function useReaction(): UseReaction {
   const consumedAtRef = useRef(0);
   const waitersRef = useRef<Waiter[]>([]);
 
-  const submit = useCallback((kind: ReactionKind, note?: string) => {
+  const submit = useCallback((kind: ReactionKind, note?: string): Reaction => {
     const reaction: Reaction = { kind, note: note?.trim() || null, at: Date.now() };
     lastRef.current = reaction;
     setLast(reaction);
@@ -58,7 +64,16 @@ export function useReaction(): UseReaction {
       }
       setPending(false);
     }
+    return reaction;
   }, []);
+
+  const record = useCallback(
+    (kind: ReactionKind, note?: string) => {
+      const reaction = submit(kind, note);
+      consumedAtRef.current = reaction.at;
+    },
+    [submit],
+  );
 
   const awaitNext = useCallback((timeoutMs: number) => {
     return new Promise<Reaction | null>((resolve) => {
@@ -78,5 +93,5 @@ export function useReaction(): UseReaction {
     });
   }, []);
 
-  return { last, pending, submit, awaitNext };
+  return { last, pending, submit, record, awaitNext };
 }

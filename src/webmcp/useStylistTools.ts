@@ -44,6 +44,8 @@ interface StylistToolsDeps {
   onCompareLooks: (lookIds: string[]) => void;
   /** Block until the human taps a reaction chip (or timeout). See hooks/useReaction.ts. */
   onAwaitReaction: (timeoutMs: number) => Promise<Reaction | null>;
+  /** Log a reaction the user already gave in chat, so the app's reaction bar reflects it. */
+  onRecordReaction: (kind: Reaction['kind'], note?: string) => void;
 }
 
 const SEARCH_INPUT_SCHEMA = {
@@ -103,9 +105,22 @@ const COMPARE_LOOKS_INPUT_SCHEMA = {
 const AWAIT_REACTION_INPUT_SCHEMA = {
   type: 'object',
   properties: {
+    reaction: {
+      type: 'string',
+      enum: ['love', 'like', 'try_another', 'reject'],
+      description:
+        "If the user ALREADY told you how they feel (in chat), pass it here — this logs it to " +
+        'the app and returns next-step guidance immediately, no waiting.',
+    },
+    note: {
+      type: 'string',
+      description: 'What the user wants changed, in their words (e.g. "too long", "more colour"). Optional.',
+    },
     timeoutSeconds: {
       type: 'number',
-      description: 'How long to wait for the user before giving up (default 120, max 600).',
+      description:
+        'Only used when `reaction` is omitted: how long to wait for the user to tap a reaction ' +
+        'chip in the app before giving up (default 120, max 600).',
     },
   },
 } as const;
@@ -201,7 +216,8 @@ export function useStylistTools(deps: StylistToolsDeps) {
         loadedDefaultPhoto,
         note:
           'The try-on is rendering in the app preview now. Ask the user how it looks, then call ' +
-          'await_reaction to get their verdict.',
+          "await_reaction — pass their reaction if they tell you in chat, or leave it blank to " +
+          'wait for a chip tap.',
       };
     },
   });
@@ -271,26 +287,40 @@ export function useStylistTools(deps: StylistToolsDeps) {
   const awaitReaction = useWebMCP({
     name: 'await_reaction',
     description:
-      "Wait for the user's structured reaction to the current try-on. Call this right after " +
-      'apply_tryon (and after asking them how it looks). Blocks until the user taps a reaction in ' +
-      'the app — Love it / Good / Try another / Not this — with an optional note, or until it times ' +
-      'out. Returns { reaction, note, guidance }.',
+      "Record or wait for the user's reaction to the current try-on — call it right after " +
+      'apply_tryon. Two ways: (a) if the user already told you how they feel in chat, pass ' +
+      '`reaction` (love / like / try_another / reject) and optionally `note` — it logs to the ' +
+      "app's reaction bar and returns guidance immediately; (b) omit `reaction` to block until " +
+      'the user taps a reaction chip in the app (or it times out). Returns { reaction, note, guidance }.',
     inputSchema: AWAIT_REACTION_INPUT_SCHEMA,
-    annotations: { readOnlyHint: true },
-    execute: async ({ timeoutSeconds }) => {
+    annotations: { readOnlyHint: false, idempotentHint: true },
+    execute: async ({ reaction, note, timeoutSeconds }) => {
+      // (a) chat channel — the user already reacted, just log it + guide.
+      if (reaction) {
+        depsRef.current.onRecordReaction(reaction, note);
+        return {
+          reaction,
+          note: note ?? null,
+          source: 'chat',
+          guidance: REACTION_GUIDANCE[reaction],
+        };
+      }
+      // (b) chip channel — block for a tap in the app.
       const seconds = Math.min(600, Math.max(5, timeoutSeconds ?? 120));
-      const reaction = await depsRef.current.onAwaitReaction(seconds * 1000);
-      if (!reaction) {
+      const tapped = await depsRef.current.onAwaitReaction(seconds * 1000);
+      if (!tapped) {
         return {
           reaction: 'none',
           note: null,
-          guidance: 'The user did not react in time. Prompt them again, or ask in chat.',
+          source: 'timeout',
+          guidance: 'The user did not tap a reaction. Ask them in chat, then call this again with their answer.',
         };
       }
       return {
-        reaction: reaction.kind,
-        note: reaction.note,
-        guidance: REACTION_GUIDANCE[reaction.kind],
+        reaction: tapped.kind,
+        note: tapped.note,
+        source: 'chip',
+        guidance: REACTION_GUIDANCE[tapped.kind],
       };
     },
   });

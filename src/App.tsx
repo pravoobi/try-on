@@ -724,6 +724,7 @@ export default function App() {
     onSaveLook: captureLook,
     onCompareLooks: looks.setComparison,
     onAwaitReaction: reaction.awaitNext,
+    onRecordReaction: reaction.record,
   });
 
   // Clear the "stylist applied X" banner a few seconds after it appears.
