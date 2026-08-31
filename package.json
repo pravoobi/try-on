@@ -19,7 +19,8 @@
     "fetch-models": "node tools/fetch-models.mjs",
     "fetch-test-photos": "node tools/fetch-test-photos.mjs",
     "smoke:webmcp": "node tools/webmcp-smoke.mjs",
-    "demo:webmcp": "node tools/webmcp-demo.mjs --headed"
+    "demo:webmcp": "node tools/webmcp-demo.mjs --headed",
+    "thumb:webmcp": "node tools/webmcp-thumb.mjs"
   },
   "dependencies": {
     "@mcp-b/global": "^5.0.1",
