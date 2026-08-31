@@ -127,10 +127,13 @@ bar run the same loop the agent does.
       reaction bar and get guidance immediately, or omit it to block for a chip
       tap. Response carries `source` (chat/chip/timeout). Smoke test → 19
       checks. Deployed + live.
-- [ ] **Day 6 (Wed, Sep 2)** — Update repo README with the real architecture
-      (current README undersells the project — 36 garments and multi-piece
-      compositing exist, only 4 garments are documented). Record demo video.
-      Fill out submission.
+- [ ] **Day 6 (Wed, Sep 2)** — ~~README rewrite~~ ✅ (commit ee7016f — leads
+      with the WebMCP loop + 5-tool table + human-in-the-loop design). Still
+      to do: **record the demo video** (best cut: the ChatGPT/Claude
+      conversation driving search→apply→react→save→compare beside the live
+      app — the transcript from Day-5 testing is the storyboard); swap
+      `docs/demo.gif` for an agent-loop clip; **fill out the submission**
+      (repo URL + video + a description hitting all 5 criteria).
 - [ ] **Day 7 (Thu, Sep 3)** — Submit well before 1 PM PT / 1:30 AM IST
       (Sep 4) — don't cut it close across the timezone gap.
 
