@@ -128,11 +128,10 @@ bar run the same loop the agent does.
       tap. Response carries `source` (chat/chip/timeout). Smoke test → 19
       checks. Deployed + live.
 - [ ] **Day 6 (Wed, Sep 2)** — ~~README rewrite~~ ✅ (ee7016f). ~~demo GIF~~ ✅
-      (42443c7 — `tools/webmcp-demo.mjs` drives all 5 tools → `docs/demo.gif`,
-      real WebGPU composites, 425 KB). Still to do: a screen-recorded **demo
-      video** for the submission if it wants one beyond the GIF (best cut: the
-      real ChatGPT conversation beside the app); **fill out the submission**
-      (repo URL + video + a description hitting all 5 criteria).
+      (42443c7). ~~submission thumbnail~~ ✅ (29bc470 — `docs/thumbnail.png`,
+      3:2). Name = "Virtual Try-On + AI Stylist"; pitch drafted. Still to do:
+      the long submission **description** (5 criteria); a screen-recorded
+      **video** if the form wants one beyond the GIF.
 - [ ] **Day 7 (Thu, Sep 3)** — Submit well before 1 PM PT / 1:30 AM IST
       (Sep 4) — don't cut it close across the timezone gap.
 
