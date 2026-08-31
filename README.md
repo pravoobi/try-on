@@ -8,7 +8,7 @@ human judges fit and vibe.
 
 **▶ Live: <https://pravoobi.github.io/try-on/>**
 
-![Demo: photo try-on across garments, then a WebGPU vs. CPU comparison](docs/demo.gif)
+![Demo: an agent searches the catalog for a sangeet outfit under ₹8k, applies the try-on, takes the "love it" reaction, then applies and compares a lehenga alongside it](docs/demo.gif)
 
 **GitHub topics:** `webmcp` `model-context-protocol` `ai-agents` `virtual-try-on`
 `litert` `litertjs` `webgpu` `on-device-ml` `react` `react-hooks` `computer-vision`
