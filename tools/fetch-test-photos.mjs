@@ -15,8 +15,8 @@ import { fileURLToPath } from 'node:url';
 const PHOTOS = [
   {
     file: 'photo-01.jpg',
-    note: 'swimwear, frontal, hands on hip — "Leggy model on the runway" by Kevin Trotman, CC BY 2.0',
-    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Leggy_model_on_the_runway_at_the_fashion_show_%28IMG_0124a%29_%283508948725%29.jpg/960px-Leggy_model_on_the_runway_at_the_fashion_show_%28IMG_0124a%29_%283508948725%29.jpg',
+    note: 'loose dress, arm on hip — "Stephanie ready to hit the runway (IMG 7666a)", CC BY 2.0',
+    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Stephanie_ready_to_hit_the_runway_%28IMG_7666a%29_%285459417671%29.jpg/960px-Stephanie_ready_to_hit_the_runway_%28IMG_7666a%29_%285459417671%29.jpg',
   },
   {
     file: 'photo-02.jpg',
@@ -25,8 +25,8 @@ const PHOTOS = [
   },
   {
     file: 'photo-03.jpg',
-    note: 'loose dress, arm on hip — "Stephanie ready to hit the runway (IMG 7666a)", CC BY 2.0',
-    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Stephanie_ready_to_hit_the_runway_%28IMG_7666a%29_%285459417671%29.jpg/960px-Stephanie_ready_to_hit_the_runway_%28IMG_7666a%29_%285459417671%29.jpg',
+    note: 'swimwear, frontal, hands on hip — "Leggy model on the runway" by Kevin Trotman, CC BY 2.0',
+    url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d3/Leggy_model_on_the_runway_at_the_fashion_show_%28IMG_0124a%29_%283508948725%29.jpg/960px-Leggy_model_on_the_runway_at_the_fashion_show_%28IMG_0124a%29_%283508948725%29.jpg',
   },
   {
     file: 'photo-04.jpg',

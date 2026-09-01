@@ -95,15 +95,15 @@ export const config = {
   },
   /**
    * Quick-load test photos served from /test-photos/ (fetched by npm run
-   * fetch-test-photos). The first entry is the hero/default photo: it's what
-   * the WebMCP `apply_tryon` tool cold-loads when the user hasn't picked one,
-   * so it should be the frame the demo catalog looks best on (photo-03 — a
-   * clean full-body model shot, verified against all 8 catalog garments).
+   * fetch-test-photos). The first entry is the hero/default photo — what the
+   * WebMCP `apply_tryon` tool cold-loads when the user hasn't picked one — so
+   * photo-01 is the clean full-body model shot the demo catalog was tuned
+   * against (all 8 garments verified on it). Keep this list in filename order.
    */
   testPhotos: [
-    'photo-03.jpg',
-    'photo-02.jpg',
     'photo-01.jpg',
+    'photo-02.jpg',
+    'photo-03.jpg',
     'photo-04.jpg',
     'photo-05.jpg',
   ],
