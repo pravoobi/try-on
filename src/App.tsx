@@ -946,8 +946,16 @@ export default function App() {
     onGesture,
   );
 
+  // Presentation mode (?present): strips the dev/debug chrome — perf tiles,
+  // debug checkboxes, advanced-mode row, test-photo buttons, upload button —
+  // for demo screenshots and video. See `.presenting` in index.css.
+  const presenting = useMemo(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('present'),
+    [],
+  );
+
   return (
-    <div className="app">
+    <div className={'app' + (presenting ? ' presenting' : '')}>
       <div className="top-bar">
         <header>
           {mode !== 'live' && (
@@ -1010,7 +1018,7 @@ export default function App() {
 
       <div className="layout">
         <div className="main-column">
-          <div className="controls">
+          <div className="controls controls-view">
             <div className="segmented" role="group" aria-label="mode">
               <button className={mode === 'photo' ? 'selected' : ''} onClick={() => setMode('photo')}>
                 photo
@@ -1047,7 +1055,7 @@ export default function App() {
             </label>
           </div>
 
-          <div className="controls">
+          <div className="controls controls-advanced">
             {advanced.status === 'off' && (
               <button onClick={() => advanced.setEnabled(true)}>
                 Enhance (3D) · ~30MB one-time download{!advanced.webgpuSupported ? ' · CPU (slower)' : ''}
@@ -1096,9 +1104,9 @@ export default function App() {
           </div>
 
           {mode === 'photo' && (
-            <div className="controls">
+            <div className="controls controls-photo">
               <label>
-              Your Photo 
+              Your Photo
                 <input type="file" accept="image/*" onChange={onFile} disabled={pipeline.status !== 'ready'} />
               </label>
               <span className="hint">test photos:</span>
@@ -1115,7 +1123,7 @@ export default function App() {
           )}
 
           {mode === 'live' && (
-            <div className="controls">
+            <div className="controls controls-live">
               {!isFullscreen && <button onClick={enterFullscreen}>⛶ fullscreen</button>}
               <span className="hint">
                 {webcam.status === 'requesting' && 'requesting camera access…'}

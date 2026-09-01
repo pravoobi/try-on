@@ -703,6 +703,30 @@ h1 {
   margin-top: 0.4rem;
 }
 
+/* Presentation mode (App.tsx ?present) — a clean stage for demo screenshots
+   and video. Hides the dev/debug surface (perf tiles + WebGPU/CPU toggle,
+   the mask/skeleton/match-colors checkboxes, the advanced-mode row, the
+   init-time line, the tagline). Keeps everything you still need to run a
+   demo: the photo/live toggle, the test-photo + upload controls, "upload
+   your own garment", the garment picker, the reaction bar and the looks
+   tray. The "AI stylist tools live" indicator stays — it's the point. */
+.presenting .perf-stats,
+.presenting .status:not(.webmcp-status),
+.presenting .tagline,
+.presenting .controls-view label,
+.presenting .controls-advanced,
+.presenting .controls-live .hint {
+  display: none !important;
+}
+
+.presenting header {
+  margin-bottom: 0.25rem;
+}
+
+.presenting .controls-view {
+  margin-bottom: 0.5rem;
+}
+
 @keyframes webmcp-pulse {
   0% {
     box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.5);
