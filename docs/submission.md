@@ -1,5 +1,14 @@
 # Virtual Try-On + AI Stylist
 
+**Existing project.** The on-device try-on app (WebGPU, segmentation + pose +
+thin-plate-spline warp, published as `@practics/tryon-core`) predates the
+hackathon — last commit 2026-07-29. Everything WebMCP is new, built Aug 29 –
+Sep 2: the five-tool surface (`src/webmcp/`), the reaction channel
+(`useReaction`, `ReactionBar`), the saved-looks tray and compare view
+(`useLooks`, `LooksPanel`), `await_reaction`'s dual-mode design, the merchandised
+8-garment catalog, and a 19-check Playwright test over the tools. Every WebMCP
+commit in the history is dated Aug 29 or later.
+
 ## Inspiration
 
 Virtual try-on is almost always a server job. You upload your photo, a diffusion
