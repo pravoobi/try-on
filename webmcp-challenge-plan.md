@@ -127,11 +127,14 @@ bar run the same loop the agent does.
       reaction bar and get guidance immediately, or omit it to block for a chip
       tap. Response carries `source` (chat/chip/timeout). Smoke test → 19
       checks. Deployed + live.
-- [ ] **Day 6 (Wed, Sep 2)** — ~~README rewrite~~ ✅ (ee7016f). ~~demo GIF~~ ✅
-      (42443c7). ~~submission thumbnail~~ ✅ (29bc470 — `docs/thumbnail.png`,
-      3:2). Name = "Virtual Try-On + AI Stylist"; pitch drafted. Still to do:
-      the long submission **description** (5 criteria); a screen-recorded
-      **video** if the form wants one beyond the GIF.
+- [x] **Day 6 (Wed, Sep 2)** — ~~README rewrite~~ ✅ (ee7016f). ~~demo GIF~~ ✅
+      (42443c7). ~~thumbnail~~ ✅ (29bc470). ~~`?present` clean mode~~ ✅
+      (f457d82). ~~test-photo rename~~ ✅ (3f26606 — photo-01 = hero, in order).
+      ~~submission story~~ ✅ (`docs/submission.md`, Devpost format).
+      ~~8-image gallery~~ ✅ (645d631 — `docs/gallery/`, `npm run gallery:webmcp`).
+      Name = "Virtual Try-On + AI Stylist"; pitch, Built-with tags, Try-it-out
+      links all drafted. **Left:** paste it into the Devpost form; optional
+      screen-recorded video (open `…/?present`).
 - [ ] **Day 7 (Thu, Sep 3)** — Submit well before 1 PM PT / 1:30 AM IST
       (Sep 4) — don't cut it close across the timezone gap.
 
