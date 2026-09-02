@@ -113,3 +113,82 @@ explicit confirmation from you, never the agent alone. A bigger catalog; the
 pipeline already handles pants and multi-piece outfits. And folding the tool
 layer into `@practics/tryon-core`, so any store widget built on the pipeline gets
 the agent surface for free.
+
+---
+
+# The other Devpost fields
+
+**Project name**
+
+Virtual Try-On + AI Stylist
+
+**Elevator pitch** (≤200 chars)
+
+Virtual try-on that runs entirely in your browser. Its catalog search, try-on,
+save and compare are WebMCP tools; an AI agent proposes outfits, you judge the
+fit. No server, no uploads.
+
+**Built with**
+
+webmcp, model-context-protocol, typescript, react, vite, webgpu, litert.js,
+tensorflow.js, mediapipe, movenet, hugging-face, onnx, webassembly, web-workers,
+canvas, computer-vision, pose-estimation, image-segmentation, thin-plate-spline,
+on-device-ml, playwright, github-pages, github-actions, npm
+
+**Try it out**
+
+- Live: <https://pravoobi.github.io/try-on/>
+- Code: <https://github.com/pravoobi/try-on>
+- Pipeline on npm: <https://www.npmjs.com/package/@practics/tryon-core>
+- Demo video: <https://www.youtube.com/watch?v=sBZQMz-qqkI>
+
+**Existing project — what changed during the submission period**
+
+See the note at the top of this document. The try-on app predates the hackathon
+(last commit July 29); everything WebMCP was built Aug 29 – Sep 2.
+
+**Which agents or clients did you test with**
+
+ChatGPT (the desktop app's built-in browser) is the real agent we tested.
+Against the live site, one prompt ran the whole loop: `search_catalog` →
+`apply_tryon` → `await_reaction` → `save_look`, then another `apply_tryon` and
+`compare_looks`. It needs a WebMCP-capable model and "use sitetools:" in the
+prompt, or it web-searches instead. We checked the tools land in ChatGPT's own
+runtime and not just the polyfill: in its console,
+`Object.getOwnPropertyDescriptor(document, 'modelContext').configurable` is
+`false` (the browser owns the API) and `getTools()` returns all five.
+
+We also drove the tools directly, the way an in-page agent would: `getTools()`,
+then `executeTool(tool, args)`. `npm run smoke:webmcp` is a Playwright check that
+calls all five and asserts each response (19 checks); the demo GIF, thumbnail
+and gallery are recorded the same way. `@mcp-b/global` defers to a native
+`document.modelContext` when the browser has one, so the same code would work
+with a Chrome agent or Claude through a bridge extension. ChatGPT is the one we
+put it in front of.
+
+**Which AI tools did you use**
+
+Claude Code (Anthropic's CLI agent, running Claude Sonnet) did most of the
+submission-period work, pair-programming style: wrote the WebMCP tool layer, the
+reaction and looks hooks and components, the catalog filter and its tests, and
+the Playwright test suite; drove a browser to test the tools end to end and to
+record the demo GIF, thumbnail and gallery; debugged the CI and deploy failures
+and the headless-WebGPU issue; and drafted and tightened the README, this
+description and the video script. ChatGPT was the live agent used to validate the
+tools. The base app that predates the hackathon was also largely built with
+Claude Code.
+
+**Level of learning**
+
+Significant. WebMCP is only weeks old, so there was no playbook — the learning
+was in how agents decide to call site tools (and why they don't), how a polyfill
+hands off to a native browser API, and where to draw the line between what the
+agent does and what the person still owns. What carries over: designing tool
+surfaces for agents (schemas, annotations, hint chains), the human-in-the-loop
+framing, and shipping against an unstable spec.
+
+**Created by**
+
+Solo. Built the five WebMCP tools and the agent-facing UI (reaction bar,
+saved-looks tray, compare view), curated the catalog, and wrote the tests and
+demo. The on-device try-on pipeline underneath is my earlier work.
