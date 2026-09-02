@@ -6,7 +6,7 @@ and an AI agent can search the catalog and apply try-ons through
 [WebMCP](https://webmachinelearning.github.io/webmcp/) site tools while the
 human judges fit and vibe.
 
-**▶ Live: <https://pravoobi.github.io/try-on/>**
+**▶ Live: <https://pravoobi.github.io/try-on/>** · **📺 Demo video: <https://www.youtube.com/watch?v=sBZQMz-qqkI>**
 
 ![Demo: an agent searches the catalog for a sangeet outfit under ₹8k, applies the try-on, takes the "love it" reaction, then applies and compares a lehenga alongside it](docs/demo.gif)
 
